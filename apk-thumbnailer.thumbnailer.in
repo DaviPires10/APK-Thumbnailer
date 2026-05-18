@@ -1,0 +1,6 @@
+[Thumbnailer Entry]
+Version=1.0.0
+Name=APK Thumbnailer
+Comment=Generates thumbnails for Android APK files
+Exec=@BINDIR@/apk-thumbnailer -i %i -o %o -s %s
+MimeType=@MIME_TYPES@
