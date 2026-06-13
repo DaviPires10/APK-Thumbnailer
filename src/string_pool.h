@@ -16,31 +16,20 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef STRING_POOL_H
+#define STRING_POOL_H
 
-#include <stdbool.h>
+#include "binary_reader.h"
+
 #include <stddef.h>
-#include <stdint.h>
-#include <uchar.h>
 
 typedef struct {
-  const uint8_t *data;
-  size_t size;
-  size_t pos;
-} Buffer;
+  char **strings;
+  size_t count;
+} StringPool;
 
-Buffer create_buffer(const uint8_t *data, size_t size);
-
-bool at_end(Buffer *buf);
-void seek(Buffer *buf, size_t pos);
-void skip(Buffer *buf, size_t bytes);
-
-uint8_t read_u8(Buffer *buf);
-uint16_t read_u16(Buffer *buf);
-uint32_t read_u32(Buffer *buf);
-size_t read_raw(Buffer *buf, void *dst, size_t bytes);
-
-char *utf16_to_utf8(const char16_t *utf16, size_t len);
+StringPool parse_string_pool(BinaryReader *reader);
+char *string_pool_get(StringPool pool, size_t idx);
+void string_pool_free(StringPool *pool);
 
 #endif

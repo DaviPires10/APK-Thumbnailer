@@ -1,4 +1,4 @@
-# APK Thumbnailer
+#APK Thumbnailer
 
 APK Thumbnailer is a fast and lightweight icon extractor for Android APK files, written in C.
 

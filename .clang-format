@@ -1,0 +1,26 @@
+BasedOnStyle: LLVM
+ColumnLimit: 80
+UseTab: Never
+
+# Alignment Options
+AlignAfterOpenBracket: Align
+AlignArrayOfStructures: Left
+AlignConsecutiveAssignments: true
+AlignOperands: Align
+
+# Blank Line and Block Options
+AllowShortBlocksOnASingleLine: true
+AllowShortFunctionsOnASingleLine: None
+BreakBeforeBraces: Attach
+
+# Indentation Options
+IndentCaseLabels: true
+IndentWidth: 2
+
+# Parameter Options
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackParameters: false
+
+# Sorting and Include Options
+IncludeBlocks: Regroup
+SortIncludes: CaseSensitive

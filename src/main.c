@@ -17,12 +17,12 @@
  */
 
 #include "apk.h"
-
-#include <getopt.h>
-#include <stdbool.h>
-#include <string.h>
+#include "string_pool.h"
 
 #include <MagickWand/MagickWand.h>
+#include <getopt.h>
+#include <stdio.h>
+#include <string.h>
 
 static const struct option long_opts[] = {
     {"help",    no_argument,       0, 'h'},
@@ -33,7 +33,9 @@ static const struct option long_opts[] = {
     {0,         0,                 0, 0  }
 };
 
-void extract_image(MagickWand **image, char *filename, uint8_t *data,
+void extract_image(MagickWand **image,
+                   char *filename,
+                   uint8_t *data,
                    size_t size) {
   MagickWand *icon = NewMagickWand();
 
@@ -117,7 +119,7 @@ int main(int argc, char **argv) {
   zip_t *za                = NULL;
   uint8_t *manifest_data   = NULL;
   uint8_t *resources_data  = NULL;
-  char **icon_paths        = NULL;
+  StringPool icons         = {0};
   MagickWand *image        = NULL;
   ExceptionType wand_error = 0;
   char *wand_err_desc      = NULL;
@@ -143,10 +145,16 @@ int main(int argc, char **argv) {
   // get icon_id from AndroidManifest.xml
   uint32_t icon_id =
       get_application_icon_resource_reference_id(manifest_data, manifest_size);
-  if (icon_id == (uint32_t)-1) {
-    fprintf(stderr, "Failed to find icon ID\n");
+  if (icon_id == 0 || icon_id == UINT32_MAX) {
+    fprintf(stderr,
+            "Failed to find 'android:icon' ID inside AndroidManifest.xml\n");
     goto cleanup;
   }
+
+  if (verbose) {
+    printf("Found target Icon Reference ID: 0x%08X\n", icon_id);
+  }
+
   free(manifest_data);
   manifest_data = NULL;
 
@@ -158,41 +166,56 @@ int main(int argc, char **argv) {
   }
 
   // get icon_paths from resources.arsc
-  icon_paths = get_application_icon_resource_path(resources_data,
-                                                  resources_size, icon_id);
-  if (!icon_paths) {
-    fprintf(stderr, "Failed to get icon paths\n");
+  icons = get_application_icon_resource_path(resources_data, resources_size,
+                                             icon_id);
+  if (!icons.strings) {
+    fprintf(stderr,
+            "Failed to resolve ID 0x%08X to any file paths in resources.arsc\n",
+            icon_id);
     goto cleanup;
   }
+
   free(resources_data);
   resources_data = NULL;
 
   MagickWandGenesis();
   magick_initialised = true;
 
-  for (char **p = icon_paths; *p; ++p) {
-    const char *dot = strrchr(*p, '.');
+  for (size_t i = 0; i < icons.count; ++i) {
+    char *path = icons.strings[i];
+    if (!path) {
+      continue;
+    }
+    const char *dot = strrchr(path, '.');
     if (dot && strcmp(dot, ".xml") == 0) {
       if (verbose)
-        printf("Skipped XML file: %s\n", *p);
+        printf("Skipped XML file: %s\n", path);
       continue;
     }
 
     if (verbose)
-      printf("Found %s\n", *p);
+      printf("Found Image Asset: %s\n", path);
 
     size_t icon_size;
-    uint8_t *icon_data = get_data_from_file(za, *p, &icon_size);
+    uint8_t *icon_data = get_data_from_file(za, path, &icon_size);
     if (!icon_data) {
-      fprintf(stderr, "Failed to read icon file: %s\n", *p);
+      fprintf(stderr, "Failed to extract icon file from ZIP: %s\n", path);
       goto cleanup;
     }
 
-    extract_image(&image, *p, icon_data, icon_size);
+    extract_image(&image, path, icon_data, icon_size);
     free(icon_data);
   }
+  string_pool_free(&icons);
+
   zip_close(za);
   za = NULL;
+
+  if (!image) {
+    fprintf(stderr,
+            "Failed to load any valid non-XML thumbnail image formats.\n");
+    goto cleanup;
+  }
 
   MagickSetFormat(image, "PNG");
   if (size > 0) {
@@ -222,14 +245,9 @@ cleanup:
   if (magick_initialised)
     MagickWandTerminus();
 
-  if (icon_paths) {
-    for (char **p = icon_paths; *p; ++p) {
-      if (*p) {
-        free(*p);
-      }
-    }
-    free(icon_paths);
-  }
+  if (icons.strings)
+    string_pool_free(&icons);
+
   if (resources_data)
     free(resources_data);
   if (manifest_data)

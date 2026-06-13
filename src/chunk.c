@@ -16,20 +16,26 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef APK_H
-#define APK_H
+#include "chunk.h"
 
-#include "string_pool.h"
+ResChunkHeader read_chunk_header(BinaryReader *reader) {
+  ResChunkHeader header;
+  header.type        = read_u16(reader);
+  header.header_size = read_u16(reader);
+  header.size        = read_u32(reader);
+  return header;
+}
 
-#include <zip.h>
+void skip_chunk(BinaryReader *reader,
+                size_t chunk_start_pos,
+                ResChunkHeader header) {
+  seek(reader, chunk_start_pos);
+  skip(reader, header.size);
+}
 
-uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
-                                                    size_t size);
-StringPool get_application_icon_resource_path(const uint8_t *data,
-                                              size_t size,
-                                              uint32_t reference_id);
-
-uint8_t *
-get_data_from_file(zip_t *za, const char *file_name, size_t *data_size);
-
-#endif
+void skip_chunk_header_padding(BinaryReader *buf, ResChunkHeader header) {
+  size_t current_header_read = 8;
+  if (header.header_size > current_header_read) {
+    skip(buf, header.header_size - current_header_read);
+  }
+}

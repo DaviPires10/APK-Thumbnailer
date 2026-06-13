@@ -16,20 +16,29 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef APK_H
-#define APK_H
+#ifndef BINARY_READER_H
+#define BINARY_READER_H
 
-#include "string_pool.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
-#include <zip.h>
+typedef struct {
+  const uint8_t *data;
+  size_t size;
+  size_t pos;
+} BinaryReader;
 
-uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
-                                                    size_t size);
-StringPool get_application_icon_resource_path(const uint8_t *data,
-                                              size_t size,
-                                              uint32_t reference_id);
+BinaryReader set_buffer(const uint8_t *data, size_t size);
+void clear_buffer(BinaryReader *reader);
 
-uint8_t *
-get_data_from_file(zip_t *za, const char *file_name, size_t *data_size);
+bool at_end(BinaryReader *reader);
+void seek(BinaryReader *reader, size_t pos);
+void skip(BinaryReader *reader, size_t bytes);
+
+uint8_t read_u8(BinaryReader *reader);
+uint16_t read_u16(BinaryReader *reader);
+uint32_t read_u32(BinaryReader *reader);
+size_t read_raw(BinaryReader *reader, void *dst, size_t bytes);
 
 #endif
