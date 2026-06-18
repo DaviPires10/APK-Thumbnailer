@@ -21,8 +21,6 @@
 
 #include "binary_reader.h"
 
-#include <stddef.h>
-
 typedef struct {
   char **strings;
   size_t count;
@@ -30,6 +28,7 @@ typedef struct {
 
 StringPool parse_string_pool(BinaryReader *reader);
 char *string_pool_get(StringPool pool, size_t idx);
+uint32_t string_pool_get_index(StringPool pool, const char *str);
 void string_pool_free(StringPool *pool);
 
 #endif

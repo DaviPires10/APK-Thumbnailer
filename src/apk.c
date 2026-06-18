@@ -27,10 +27,10 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
                                                     size_t size) {
   BinaryReader reader = set_buffer(data, size);
 
-  uint32_t str_manifest_index    = UINT32_MAX;
-  uint32_t str_application_index = UINT32_MAX;
-  uint32_t str_icon_index        = UINT32_MAX;
-  bool in_manifest_node          = false;
+  uint32_t manifest_index    = UINT32_MAX;
+  uint32_t application_index = UINT32_MAX;
+  uint32_t icon_index        = UINT32_MAX;
+  bool in_manifest_node      = false;
 
   while (!at_end(&reader)) {
     uint32_t chunk_start  = reader.pos;
@@ -45,37 +45,31 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
         seek(&reader, chunk_start);
         StringPool pool = parse_string_pool(&reader);
 
-        for (size_t i = 0; i < pool.count; i++) {
-          char *s = string_pool_get(pool, i);
-          if (s) {
-            if (strcmp(s, "manifest") == 0) {
-              str_manifest_index = i;
-            } else if (strcmp(s, "application") == 0) {
-              str_application_index = i;
-            } else if (strcmp(s, "icon") == 0) {
-              str_icon_index = i;
-            }
-          }
-          if (str_manifest_index != UINT32_MAX &&
-              str_application_index != UINT32_MAX &&
-              str_icon_index != UINT32_MAX)
-            break;
-        }
+        manifest_index    = string_pool_get_index(pool, "manifest");
+        application_index = string_pool_get_index(pool, "application");
+        icon_index        = string_pool_get_index(pool, "icon");
+
         string_pool_free(&pool);
+
+        if (manifest_index != UINT32_MAX &&
+            application_index != UINT32_MAX &&
+            icon_index != UINT32_MAX) {
+          break;
+        }
+
         skip(&reader, header.size - (reader.pos - chunk_start));
         break;
       }
 
       case RES_XML_START_TAG_TYPE: {
-        skip(&reader, 2 * sizeof(uint32_t));
-        skip(&reader,
-             sizeof(uint32_t)); // skip namespace index
+        skip(&reader, 8); // skip line number and comment
+        skip(&reader, 4); // skip namespace index
         uint32_t name = read_u32(&reader);
 
-        if (name == str_manifest_index)
+        if (name == manifest_index)
           in_manifest_node = true;
 
-        if (!in_manifest_node || name != str_application_index) {
+        if (!in_manifest_node || name != application_index) {
           skip(&reader, header.size - (reader.pos - chunk_start));
           break;
         }
@@ -89,7 +83,7 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
           skip(&reader, 4);
           uint32_t name      = read_u32(&reader);
           uint32_t raw_value = read_u32(&reader);
-          if (name != str_icon_index) {
+          if (name != icon_index) {
             // skip typed data
             skip(&reader, 8);
             continue;
@@ -110,7 +104,7 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
         skip(&reader, 12);
         uint32_t name = read_u32(&reader);
 
-        if (name == str_manifest_index)
+        if (name == manifest_index)
           in_manifest_node = false;
         break;
       }
@@ -149,8 +143,7 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
           seek(&reader, chunk_start);
           pool = parse_string_pool(&reader);
         }
-        goto skip_chunk;
-        break;
+        goto next_chunk;
       }
 
       case RES_XML_PACKAGE_TYPE: {
@@ -161,7 +154,7 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
       case RES_XML_TYPE_TYPE: {
         uint8_t id = read_u8(&reader);
         if (id != res_type)
-          goto skip_chunk;
+          goto next_chunk;
 
         (void)read_u8(&reader);
         (void)read_u16(&reader);
@@ -172,13 +165,13 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
         skip(&reader, type_spec_size - 4);
 
         if (res_index >= entry_count)
-          goto skip_chunk;
+          goto next_chunk;
 
         skip(&reader, res_index * sizeof(uint32_t));
         uint32_t entry_index = read_u32(&reader);
 
-        if (entry_index == 0xffffffff)
-          goto skip_chunk;
+        if (entry_index == UINT32_MAX)
+          goto next_chunk;
 
         seek(&reader, chunk_start + entries_start + entry_index);
         // skip entry_size entry_flag entry_key
@@ -203,13 +196,12 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
 
           icons.strings[icons.count++] = dup_path;
         }
-
-        seek(&reader, chunk_start + header.size);
-        break;
+        goto next_chunk;
       }
-      skip_chunk:
+
+      next_chunk:
       default:
-        seek(&reader, chunk_start + header.size);
+        skip_chunk(&reader, chunk_start, header);
         break;
     }
   }
@@ -218,8 +210,7 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
   return icons;
 }
 
-uint8_t *
-get_data_from_file(zip_t *za, const char *file_name, size_t *data_size) {
+uint8_t *apk_extract_file(zip_t *za, const char *file_name, size_t *data_size) {
   zip_stat_t sb;
   int err = zip_stat(za, file_name, 0, &sb);
   if (err == -1) {

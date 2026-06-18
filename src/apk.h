@@ -30,6 +30,6 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
                                               uint32_t reference_id);
 
 uint8_t *
-get_data_from_file(zip_t *za, const char *file_name, size_t *data_size);
+apk_extract_file(zip_t *za, const char *file_name, size_t *data_size);
 
 #endif

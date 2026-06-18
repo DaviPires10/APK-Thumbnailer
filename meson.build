@@ -36,7 +36,7 @@ thumbnailer_conf = configuration_data()
 thumbnailer_conf.set('BINDIR', get_option('prefix') / get_option('bindir'))
 thumbnailer_conf.set(
     'MIME_TYPES',
-    'application/vnd.android.package-archive;application/x-apk;',
+    'application/vnd.android.package-archive;',
 )
 
 configure_file(

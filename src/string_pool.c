@@ -139,6 +139,20 @@ char *string_pool_get(StringPool pool, size_t idx) {
   return pool.strings[idx];
 }
 
+uint32_t string_pool_get_index(StringPool pool, const char *str) {
+  if (!pool.strings || !str) {
+    return UINT32_MAX;
+  }
+
+  for (uint32_t i = 0; i < pool.count; ++i) {
+    if (strcmp(pool.strings[i], str) == 0) {
+      return i;
+    }
+  }
+
+  return UINT32_MAX;
+}
+
 void string_pool_free(StringPool *pool) {
   if (!pool || !pool->strings) {
     return;

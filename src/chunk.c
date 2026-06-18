@@ -34,7 +34,7 @@ void skip_chunk(BinaryReader *reader,
 }
 
 void skip_chunk_header_padding(BinaryReader *buf, ResChunkHeader header) {
-  size_t current_header_read = 8;
+  size_t current_header_read = sizeof(header);
   if (header.header_size > current_header_read) {
     skip(buf, header.header_size - current_header_read);
   }

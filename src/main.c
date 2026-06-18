@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
   }
 
   size_t manifest_size;
-  manifest_data = get_data_from_file(za, "AndroidManifest.xml", &manifest_size);
+  manifest_data = apk_extract_file(za, "AndroidManifest.xml", &manifest_size);
   if (!manifest_data) {
     fprintf(stderr, "Failed to read AndroidManifest.xml\n");
     goto cleanup;
@@ -146,8 +146,7 @@ int main(int argc, char **argv) {
   uint32_t icon_id =
       get_application_icon_resource_reference_id(manifest_data, manifest_size);
   if (icon_id == 0 || icon_id == UINT32_MAX) {
-    fprintf(stderr,
-            "Failed to find 'android:icon' ID inside AndroidManifest.xml\n");
+    fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
     goto cleanup;
   }
 
@@ -159,7 +158,7 @@ int main(int argc, char **argv) {
   manifest_data = NULL;
 
   size_t resources_size;
-  resources_data = get_data_from_file(za, "resources.arsc", &resources_size);
+  resources_data = apk_extract_file(za, "resources.arsc", &resources_size);
   if (!resources_data) {
     fprintf(stderr, "Failed to read resources.arsc\n");
     goto cleanup;
@@ -197,7 +196,7 @@ int main(int argc, char **argv) {
       printf("Found Image Asset: %s\n", path);
 
     size_t icon_size;
-    uint8_t *icon_data = get_data_from_file(za, path, &icon_size);
+    uint8_t *icon_data = apk_extract_file(za, path, &icon_size);
     if (!icon_data) {
       fprintf(stderr, "Failed to extract icon file from ZIP: %s\n", path);
       goto cleanup;
