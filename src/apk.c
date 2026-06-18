@@ -51,14 +51,7 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
 
         string_pool_free(&pool);
 
-        if (manifest_index != UINT32_MAX &&
-            application_index != UINT32_MAX &&
-            icon_index != UINT32_MAX) {
-          break;
-        }
-
-        skip(&reader, header.size - (reader.pos - chunk_start));
-        break;
+        goto next_chunk;
       }
 
       case RES_XML_START_TAG_TYPE: {
@@ -70,8 +63,7 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
           in_manifest_node = true;
 
         if (!in_manifest_node || name != application_index) {
-          skip(&reader, header.size - (reader.pos - chunk_start));
-          break;
+          goto next_chunk;
         }
 
         skip(&reader, 2 * sizeof(uint16_t));
@@ -79,7 +71,7 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
         skip(&reader, 3 * sizeof(uint16_t));
 
         // attributes
-        for (uint32_t i = 0; i < attribute_count; i++) {
+        for (size_t i = 0; i < attribute_count; i++) {
           skip(&reader, 4);
           uint32_t name      = read_u32(&reader);
           uint32_t raw_value = read_u32(&reader);
@@ -89,8 +81,8 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
             continue;
           }
           // typed data
-          skip(&reader,
-               sizeof(uint16_t) + sizeof(uint8_t)); // skip size and zero
+          skip(&reader, 2); // skip size
+          skip(&reader, 1); // skip zero
           uint8_t data_type = read_u8(&reader);
           uint32_t data     = read_u32(&reader);
           if (raw_value == UINT32_MAX && data_type == 1 /*refernce type*/) {
@@ -109,8 +101,9 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
         break;
       }
 
+      next_chunk:
       default:
-        skip(&reader, header.size - 8);
+        skip_chunk(&reader, chunk_start, header);
         break;
     }
   }

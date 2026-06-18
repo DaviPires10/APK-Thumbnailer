@@ -101,7 +101,7 @@ StringPool parse_string_pool(BinaryReader *reader) {
 
   read_raw(reader, pool.offsets, pool.strings_count * sizeof(uint32_t));
 
-  for (int i = 0; i < pool.strings_count; ++i) {
+  for (size_t i = 0; i < pool.strings_count; ++i) {
     seek(reader, pool_start + pool.strings_start + pool.offsets[i]);
     if ((pool.flags & 0x100) != 0) {    // UTF-8
       (void)decode_utf8_length(reader); // skip char length
@@ -144,7 +144,7 @@ uint32_t string_pool_get_index(StringPool pool, const char *str) {
     return UINT32_MAX;
   }
 
-  for (uint32_t i = 0; i < pool.count; ++i) {
+  for (size_t i = 0; i < pool.count; ++i) {
     if (strcmp(pool.strings[i], str) == 0) {
       return i;
     }
@@ -157,7 +157,7 @@ void string_pool_free(StringPool *pool) {
   if (!pool || !pool->strings) {
     return;
   }
-  for (int i = 0; i < pool->count; ++i) {
+  for (size_t i = 0; i < pool->count; ++i) {
     free(pool->strings[i]);
   }
   free(pool->strings);
