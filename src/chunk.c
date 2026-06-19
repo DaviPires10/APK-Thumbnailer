@@ -18,8 +18,8 @@
 
 #include "chunk.h"
 
-ResChunkHeader read_chunk_header(BinaryReader *reader) {
-  ResChunkHeader header;
+ResChunk_header read_chunk_header(BinaryReader *reader) {
+  ResChunk_header header;
   header.type        = read_u16(reader);
   header.header_size = read_u16(reader);
   header.size        = read_u32(reader);
@@ -28,12 +28,12 @@ ResChunkHeader read_chunk_header(BinaryReader *reader) {
 
 void skip_chunk(BinaryReader *reader,
                 size_t chunk_start_pos,
-                ResChunkHeader header) {
+                ResChunk_header header) {
   seek(reader, chunk_start_pos);
   skip(reader, header.size);
 }
 
-void skip_chunk_header_padding(BinaryReader *buf, ResChunkHeader header) {
+void skip_chunk_header_padding(BinaryReader *buf, ResChunk_header header) {
   size_t current_header_read = sizeof(header);
   if (header.header_size > current_header_read) {
     skip(buf, header.header_size - current_header_read);

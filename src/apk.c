@@ -33,8 +33,8 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
   bool in_manifest_node      = false;
 
   while (!at_end(&reader)) {
-    uint32_t chunk_start  = reader.pos;
-    ResChunkHeader header = read_chunk_header(&reader);
+    uint32_t chunk_start   = reader.pos;
+    ResChunk_header header = read_chunk_header(&reader);
 
     switch (header.type) {
       case RES_XML_TYPE: {
@@ -122,8 +122,8 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
   StringPool icons = {0};
 
   while (!at_end(&reader)) {
-    uint32_t chunk_start  = reader.pos;
-    ResChunkHeader header = read_chunk_header(&reader);
+    uint32_t chunk_start   = reader.pos;
+    ResChunk_header header = read_chunk_header(&reader);
 
     switch (header.type) {
       case RES_XML_TABLE_TYPE: {

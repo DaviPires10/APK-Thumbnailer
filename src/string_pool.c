@@ -24,6 +24,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+struct ResStringPool_header {
+  ResChunk_header header;
+  uint32_t strings_count;
+  uint32_t styles_count;
+  uint32_t flags;
+  uint32_t strings_start;
+  uint32_t styles_start;
+};
+
 static int decode_utf8_length(BinaryReader *reader) {
   uint8_t len = read_u8(reader);
   if (len & 0x80) {
@@ -70,17 +79,7 @@ StringPool parse_string_pool(BinaryReader *reader) {
   size_t pool_start = reader->pos;
   StringPool result = {0};
 
-  struct ResStringPool {
-    ResChunkHeader header;
-    uint32_t strings_count;
-    uint32_t styles_count;
-    uint32_t flags;
-    uint32_t strings_start;
-    uint32_t styles_start;
-    uint32_t *offsets;
-    char **strings;
-  } pool;
-
+  struct ResStringPool_header pool;
   pool.header        = read_chunk_header(reader);
   pool.strings_count = read_u32(reader);
   pool.styles_count  = read_u32(reader);
@@ -91,42 +90,42 @@ StringPool parse_string_pool(BinaryReader *reader) {
   if (pool.strings_count == 0) {
     return result;
   }
-  pool.offsets = malloc(pool.strings_count * sizeof(uint32_t));
-  pool.strings = malloc(pool.strings_count * sizeof(char *));
-  if (!pool.offsets || !pool.strings) {
-    free(pool.offsets);
-    free(pool.strings);
+  uint32_t *offsets = malloc(pool.strings_count * sizeof(uint32_t));
+  char **strings    = malloc(pool.strings_count * sizeof(char *));
+  if (!offsets || !strings) {
+    free(offsets);
+    free(strings);
     return result;
   }
 
-  read_raw(reader, pool.offsets, pool.strings_count * sizeof(uint32_t));
+  read_raw(reader, offsets, pool.strings_count * sizeof(uint32_t));
 
   for (size_t i = 0; i < pool.strings_count; ++i) {
-    seek(reader, pool_start + pool.strings_start + pool.offsets[i]);
+    seek(reader, pool_start + pool.strings_start + offsets[i]);
     if ((pool.flags & 0x100) != 0) {    // UTF-8
       (void)decode_utf8_length(reader); // skip char length
-      int length      = decode_utf8_length(reader);
-      pool.strings[i] = malloc(length + 1);
-      if (pool.strings[i]) {
-        read_raw(reader, pool.strings[i], length + 1);
+      int length = decode_utf8_length(reader);
+      strings[i] = malloc(length + 1);
+      if (strings[i]) {
+        read_raw(reader, strings[i], length + 1);
       } else {
-        pool.strings[i] = strdup("");
+        strings[i] = strdup("");
       }
     } else { // UTF-16
       int length         = decode_utf16_length(reader);
       uint16_t *utf16str = malloc(length * sizeof(uint16_t));
       if (utf16str) {
         read_raw(reader, utf16str, length * sizeof(uint16_t));
-        pool.strings[i] = utf16_to_utf8(utf16str, length);
+        strings[i] = utf16_to_utf8(utf16str, length);
         free(utf16str);
       } else {
-        pool.strings[i] = strdup("");
+        strings[i] = strdup("");
       }
     }
   }
-  free(pool.offsets);
+  free(offsets);
 
-  result.strings = pool.strings;
+  result.strings = strings;
   result.count   = pool.strings_count;
 
   return result;

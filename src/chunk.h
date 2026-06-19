@@ -48,11 +48,11 @@ typedef struct {
   uint16_t type;
   uint16_t header_size;
   uint32_t size;
-} ResChunkHeader;
+} ResChunk_header;
 
-ResChunkHeader read_chunk_header(BinaryReader *reader);
+ResChunk_header read_chunk_header(BinaryReader *reader);
 void skip_chunk(BinaryReader *reader,
                 size_t chunk_start_pos,
-                ResChunkHeader header);
-void skip_chunk_header_padding(BinaryReader *buf, ResChunkHeader header);
+                ResChunk_header header);
+void skip_chunk_header_padding(BinaryReader *buf, ResChunk_header header);
 #endif
