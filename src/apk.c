@@ -42,8 +42,7 @@ uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
       }
 
       case RES_XML_STRING_POOL_TYPE: {
-        seek(&reader, chunk_start);
-        StringPool pool = parse_string_pool(&reader);
+        StringPool pool = parse_string_pool(&reader, chunk_start);
 
         manifest_index    = string_pool_get_index(pool, "manifest");
         application_index = string_pool_get_index(pool, "application");
@@ -133,8 +132,7 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
 
       case RES_XML_STRING_POOL_TYPE: {
         if (pool.count == 0) {
-          seek(&reader, chunk_start);
-          pool = parse_string_pool(&reader);
+          pool = parse_string_pool(&reader, chunk_start);
         }
         goto next_chunk;
       }

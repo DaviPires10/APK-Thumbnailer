@@ -18,14 +18,11 @@
 
 #include "string_pool.h"
 
-#include "chunk.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 struct ResStringPool_header {
-  ResChunk_header header;
   uint32_t strings_count;
   uint32_t styles_count;
   uint32_t flags;
@@ -75,12 +72,10 @@ static char *utf16_to_utf8(const uint16_t *in, size_t len) {
   return out;
 }
 
-StringPool parse_string_pool(BinaryReader *reader) {
-  size_t pool_start = reader->pos;
+StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   StringPool result = {0};
 
   struct ResStringPool_header pool;
-  pool.header        = read_chunk_header(reader);
   pool.strings_count = read_u32(reader);
   pool.styles_count  = read_u32(reader);
   pool.flags         = read_u32(reader);
@@ -101,7 +96,7 @@ StringPool parse_string_pool(BinaryReader *reader) {
   read_raw(reader, offsets, pool.strings_count * sizeof(uint32_t));
 
   for (size_t i = 0; i < pool.strings_count; ++i) {
-    seek(reader, pool_start + pool.strings_start + offsets[i]);
+    seek(reader, chunk_start + pool.strings_start + offsets[i]);
     if ((pool.flags & 0x100) != 0) {    // UTF-8
       (void)decode_utf8_length(reader); // skip char length
       int length = decode_utf8_length(reader);

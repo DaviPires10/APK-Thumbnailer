@@ -16,23 +16,31 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef STRING_POOL_H
-#define STRING_POOL_H
+#ifndef XML_H
+#define XML_H
 
 #include "binary_reader.h"
+#include "string_pool.h"
+
+#include <stddef.h>
+#include <stdint.h>
 
 typedef struct {
-  char **strings;
-  size_t count;
-} StringPool;
+  char *ns;
+  char *name;
 
-struct ResStringPool_ref {
-  uint32_t index;
-};
+  uint8_t data_type;
+  uint32_t data;
+} XmlAttribute;
 
-StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start);
-char *string_pool_get(StringPool pool, size_t idx);
-uint32_t string_pool_get_index(StringPool pool, const char *str);
-void string_pool_free(StringPool *pool);
+typedef struct {
+  char *ns;
+  char *name;
+  uint16_t attr_count;
+  XmlAttribute *attributes;
+} XmlElement;
+
+XmlElement
+xml_parse_element(BinaryReader *reader, StringPool pool, size_t chunk_start);
 
 #endif
