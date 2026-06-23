@@ -20,6 +20,7 @@ src = files(
     'src/binary_reader.c',
     'src/chunk.c',
     'src/string_pool.c',
+    'src/xml.c',
 )
 
 

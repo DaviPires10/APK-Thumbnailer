@@ -23,92 +23,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-uint32_t get_application_icon_resource_reference_id(const uint8_t *data,
-                                                    size_t size) {
-  BinaryReader reader = set_buffer(data, size);
-
-  uint32_t manifest_index    = UINT32_MAX;
-  uint32_t application_index = UINT32_MAX;
-  uint32_t icon_index        = UINT32_MAX;
-  bool in_manifest_node      = false;
-
-  while (!at_end(&reader)) {
-    uint32_t chunk_start   = reader.pos;
-    ResChunk_header header = read_chunk_header(&reader);
-
-    switch (header.type) {
-      case RES_XML_TYPE: {
-        break;
-      }
-
-      case RES_XML_STRING_POOL_TYPE: {
-        StringPool pool = parse_string_pool(&reader, chunk_start);
-
-        manifest_index    = string_pool_get_index(pool, "manifest");
-        application_index = string_pool_get_index(pool, "application");
-        icon_index        = string_pool_get_index(pool, "icon");
-
-        string_pool_free(&pool);
-
-        goto next_chunk;
-      }
-
-      case RES_XML_START_TAG_TYPE: {
-        skip(&reader, 8); // skip line number and comment
-        skip(&reader, 4); // skip namespace index
-        uint32_t name = read_u32(&reader);
-
-        if (name == manifest_index)
-          in_manifest_node = true;
-
-        if (!in_manifest_node || name != application_index) {
-          goto next_chunk;
-        }
-
-        skip(&reader, 2 * sizeof(uint16_t));
-        uint16_t attribute_count = read_u16(&reader);
-        skip(&reader, 3 * sizeof(uint16_t));
-
-        // attributes
-        for (size_t i = 0; i < attribute_count; i++) {
-          skip(&reader, 4);
-          uint32_t name      = read_u32(&reader);
-          uint32_t raw_value = read_u32(&reader);
-          if (name != icon_index) {
-            // skip typed data
-            skip(&reader, 8);
-            continue;
-          }
-          // typed data
-          skip(&reader, 2); // skip size
-          skip(&reader, 1); // skip zero
-          uint8_t data_type = read_u8(&reader);
-          uint32_t data     = read_u32(&reader);
-          if (raw_value == UINT32_MAX && data_type == 1 /*refernce type*/) {
-            return data;
-          }
-        }
-        break;
-      }
-
-      case RES_XML_END_TAG_TYPE: {
-        skip(&reader, 12);
-        uint32_t name = read_u32(&reader);
-
-        if (name == manifest_index)
-          in_manifest_node = false;
-        break;
-      }
-
-      next_chunk:
-      default:
-        skip_chunk(&reader, chunk_start, header);
-        break;
-    }
-  }
-  return 0;
-}
-
 StringPool get_application_icon_resource_path(const uint8_t *data,
                                               size_t size,
                                               uint32_t reference_id) {
@@ -173,7 +87,7 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
 
         char *path = string_pool_get(pool, string_index);
         if (path) {
-          char *dup_path = strdup(path);
+          char *dup_path = path;
           if (!dup_path) {
             continue;
           }

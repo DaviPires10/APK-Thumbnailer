@@ -33,14 +33,23 @@ typedef struct {
   uint32_t data;
 } XmlAttribute;
 
-typedef struct {
+typedef struct XmlElement {
+  struct XmlElement *parent;
+
   char *ns;
   char *name;
   uint16_t attr_count;
   XmlAttribute *attributes;
+
+  size_t children_count;
+  struct XmlElement **children;
 } XmlElement;
 
-XmlElement
-xml_parse_element(BinaryReader *reader, StringPool pool, size_t chunk_start);
+XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool);
+void xml_free_element(XmlElement *element);
+XmlElement *xml_find_child(XmlElement *element, const char *name);
+XmlElement *xml_parse_document(const uint8_t *data, size_t size);
+
+XmlAttribute *xml_find_attribute(XmlElement *element, const char *name);
 
 #endif

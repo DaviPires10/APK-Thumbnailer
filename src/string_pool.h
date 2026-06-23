@@ -31,7 +31,7 @@ struct ResStringPool_ref {
 };
 
 StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start);
-char *string_pool_get(StringPool pool, size_t idx);
+char *string_pool_get(StringPool pool, size_t index);
 uint32_t string_pool_get_index(StringPool pool, const char *str);
 void string_pool_free(StringPool *pool);
 

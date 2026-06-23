@@ -18,6 +18,7 @@
 
 #include "apk.h"
 #include "string_pool.h"
+#include "xml.h"
 
 #include <MagickWand/MagickWand.h>
 #include <getopt.h>
@@ -117,6 +118,7 @@ int main(int argc, char **argv) {
   }
 
   zip_t *za                = NULL;
+  XmlElement *manifest     = NULL;
   uint8_t *manifest_data   = NULL;
   uint8_t *resources_data  = NULL;
   StringPool icons         = {0};
@@ -143,18 +145,35 @@ int main(int argc, char **argv) {
   }
 
   // get icon_id from AndroidManifest.xml
-  uint32_t icon_id =
-      get_application_icon_resource_reference_id(manifest_data, manifest_size);
-  if (icon_id == 0 || icon_id == UINT32_MAX) {
-    fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
+  uint32_t icon_id = UINT32_MAX;
+
+  manifest = xml_parse_document(manifest_data, manifest_size);
+  if (!manifest) {
+    fprintf(stderr, "Failed to parse AndroidManifest.xml\n");
     goto cleanup;
   }
 
-  if (verbose) {
-    printf("Found target Icon Reference ID: 0x%08X\n", icon_id);
+  XmlElement *application = xml_find_child(manifest, "application");
+  if (!application) {
+    fprintf(stderr,
+            "Failed to find application tag inside AndroidManifest.xml\n");
+    goto cleanup;
   }
 
+  XmlAttribute *icon = xml_find_attribute(application, "icon");
+  if (!icon || icon->data == UINT32_MAX) {
+    fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
+    goto cleanup;
+  }
+  icon_id = icon->data;
+
+  if (verbose) {
+    printf("Found target Icon Reference ID: %#X\n", icon_id);
+  }
+
+  xml_free_element(manifest);
   free(manifest_data);
+  manifest      = NULL;
   manifest_data = NULL;
 
   size_t resources_size;
@@ -251,6 +270,8 @@ cleanup:
     free(resources_data);
   if (manifest_data)
     free(manifest_data);
+  if (manifest)
+    xml_free_element(manifest);
   if (za)
     zip_close(za);
 

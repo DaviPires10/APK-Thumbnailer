@@ -126,11 +126,11 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   return result;
 }
 
-char *string_pool_get(StringPool pool, size_t idx) {
-  if (idx >= pool.count) {
+char *string_pool_get(StringPool pool, size_t index) {
+  if (index >= pool.count) {
     return NULL;
   }
-  return pool.strings[idx];
+  return strdup(pool.strings[index]);
 }
 
 uint32_t string_pool_get_index(StringPool pool, const char *str) {
