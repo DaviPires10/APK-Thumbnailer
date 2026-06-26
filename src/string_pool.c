@@ -126,6 +126,21 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   return result;
 }
 
+void string_pool_append(StringPool *pool, char *str) {
+  if (!pool || !str) {
+    return;
+  }
+
+  if (pool->count >= pool->capacity) {
+    pool->capacity = pool->capacity ? pool->capacity * 2 : 8;
+    pool->strings  = realloc(pool->strings, pool->capacity * sizeof(char *));
+  }
+
+  if (pool->strings) {
+    pool->strings[pool->count++] = str;
+  }
+}
+
 char *string_pool_get(StringPool pool, size_t index) {
   if (index >= pool.count) {
     return NULL;

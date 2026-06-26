@@ -86,21 +86,8 @@ StringPool get_application_icon_resource_path(const uint8_t *data,
         uint32_t string_index = read_u32(&reader);
 
         char *path = string_pool_get(pool, string_index);
-        if (path) {
-          char *dup_path = path;
-          if (!dup_path) {
-            continue;
-          }
-          char **new_arr =
-              realloc(icons.strings, (icons.count + 1) * sizeof(char *));
-          if (!new_arr) {
-            free(dup_path);
-            continue;
-          }
-          icons.strings = new_arr;
+        string_pool_append(&icons, path);
 
-          icons.strings[icons.count++] = dup_path;
-        }
         goto next_chunk;
       }
 

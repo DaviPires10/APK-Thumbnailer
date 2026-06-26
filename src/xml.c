@@ -79,14 +79,16 @@ static void xml_add_child(XmlElement *parent, XmlElement *child) {
     return;
   }
 
-  XmlElement **tmp = realloc(parent->children, (parent->children_count + 1) *
-                                                   sizeof(XmlElement *));
-  if (!tmp) {
-    return;
+  if (parent->children_count >= parent->children_capacity) {
+    parent->children_capacity =
+        parent->children_capacity ? parent->children_capacity * 2 : 8;
+    parent->children = realloc(parent->children, parent->children_capacity *
+                                                     sizeof(XmlElement *));
   }
-  parent->children = tmp;
 
-  parent->children[parent->children_count++] = child;
+  if (parent->children) {
+    parent->children[parent->children_count++] = child;
+  }
 }
 
 XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool) {

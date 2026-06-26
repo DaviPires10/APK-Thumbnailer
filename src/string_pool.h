@@ -24,6 +24,7 @@
 typedef struct {
   char **strings;
   size_t count;
+  size_t capacity;
 } StringPool;
 
 struct ResStringPool_ref {
@@ -31,6 +32,7 @@ struct ResStringPool_ref {
 };
 
 StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start);
+void string_pool_append(StringPool *pool, char *str);
 char *string_pool_get(StringPool pool, size_t index);
 uint32_t string_pool_get_index(StringPool pool, const char *str);
 void string_pool_free(StringPool *pool);
