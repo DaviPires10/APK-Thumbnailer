@@ -26,8 +26,7 @@
 #include <stdint.h>
 
 typedef struct {
-  char *ns;
-  char *name;
+  struct ResStringPool_ref name;
 
   uint8_t data_type;
   uint32_t data;
@@ -36,8 +35,7 @@ typedef struct {
 typedef struct XmlElement {
   struct XmlElement *parent;
 
-  char *ns;
-  char *name;
+  struct ResStringPool_ref name;
 
   size_t attr_count;
   XmlAttribute *attributes;
@@ -47,11 +45,11 @@ typedef struct XmlElement {
   struct XmlElement **children;
 } XmlElement;
 
-XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool);
+XmlElement *xml_parse_element(BinaryReader *reader);
 void xml_free_element(XmlElement *element);
-XmlElement *xml_find_child(XmlElement *element, const char *name);
-XmlElement *xml_parse_document(const uint8_t *data, size_t size);
+XmlElement *xml_find_child(XmlElement *element, StringPool pool, const char *name);
+XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out_pool);
 
-XmlAttribute xml_find_attribute(XmlElement *element, const char *name);
+XmlAttribute xml_find_attribute(XmlElement *element, StringPool pool, const char *name);
 char *xml_parse_attribute(XmlAttribute attr, StringPool pool);
 #endif

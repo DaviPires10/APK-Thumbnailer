@@ -105,8 +105,7 @@ uint8_t *apk_extract_file(zip_t *za, const char *file_name, size_t *data_size) {
   int err = zip_stat(za, file_name, 0, &sb);
   if (err == -1) {
     zip_error_t *error = zip_get_error(za);
-    fprintf(stderr, "Failed to stat %s: %s\n", file_name,
-            zip_error_strerror(error));
+    fprintf(stderr, "Failed to stat %s: %s\n", file_name, zip_error_strerror(error));
     zip_error_fini(error);
     return NULL;
   }
@@ -114,8 +113,7 @@ uint8_t *apk_extract_file(zip_t *za, const char *file_name, size_t *data_size) {
   zip_file_t *zf = zip_fopen(za, file_name, 0);
   if (zf == NULL) {
     zip_error_t *error = zip_get_error(za);
-    fprintf(stderr, "Failed to open file for reading %s\n",
-            zip_error_strerror(error));
+    fprintf(stderr, "Failed to open file for reading %s\n", zip_error_strerror(error));
     zip_error_fini(error);
     return NULL;
   }

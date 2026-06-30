@@ -34,16 +34,13 @@ static const struct option long_opts[] = {
     {0,         0,                 0, 0  }
 };
 
-void extract_image(MagickWand **image,
-                   char *filename,
-                   uint8_t *data,
-                   size_t size) {
+void extract_image(MagickWand **image, char *file_name, uint8_t *data, size_t size) {
   MagickWand *icon = NewMagickWand();
 
   if (!MagickReadImageBlob(icon, data, size)) {
     ExceptionType wand_error;
     char *wand_err_desc = MagickGetException(icon, &wand_error);
-    fprintf(stderr, "Failed to decode %s: %s\n", filename, wand_err_desc);
+    fprintf(stderr, "Failed to decode %s: %s\n", file_name, wand_err_desc);
     MagickRelinquishMemory(wand_err_desc);
     DestroyMagickWand(icon);
     return;
@@ -131,8 +128,7 @@ int main(int argc, char **argv) {
   if (za == NULL) {
     zip_error_t error;
     zip_error_init_with_code(&error, err);
-    fprintf(stderr, "Failed to open %s: %s\n", in_path,
-            zip_error_strerror(&error));
+    fprintf(stderr, "Failed to open %s: %s\n", in_path, zip_error_strerror(&error));
     zip_error_fini(&error);
     goto cleanup;
   }
@@ -147,15 +143,18 @@ int main(int argc, char **argv) {
   // get icon_id from AndroidManifest.xml
   uint32_t icon_id = UINT32_MAX;
 
-  manifest                = xml_parse_document(manifest_data, manifest_size);
-  XmlElement *application = xml_find_child(manifest, "application");
-  XmlAttribute icon       = xml_find_attribute(application, "icon");
+  StringPool manifest_pool = {0};
+
+  manifest                = xml_parse_document(manifest_data, manifest_size, &manifest_pool);
+  XmlElement *application = xml_find_child(manifest, manifest_pool, "application");
+  XmlAttribute icon       = xml_find_attribute(application, manifest_pool, "icon");
   if (icon.data == UINT32_MAX) {
     fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
     goto cleanup;
   }
   icon_id = icon.data;
 
+  string_pool_free(&manifest_pool);
   xml_free_element(manifest);
   free(manifest_data);
   manifest      = NULL;
@@ -175,9 +174,7 @@ int main(int argc, char **argv) {
   // get icon_paths from resources.arsc
   icons = get_resource(resources_data, resources_size, icon_id);
   if (!icons.strings) {
-    fprintf(stderr,
-            "Failed to resolve ID 0x%08X to any file paths in resources.arsc\n",
-            icon_id);
+    fprintf(stderr, "Failed to resolve ID 0x%08X to any file paths in resources.arsc\n", icon_id);
     goto cleanup;
   }
 
@@ -218,8 +215,7 @@ int main(int argc, char **argv) {
   za = NULL;
 
   if (!image) {
-    fprintf(stderr,
-            "Failed to load any valid non-XML thumbnail image formats.\n");
+    fprintf(stderr, "Failed to load any valid non-XML thumbnail image formats.\n");
     goto cleanup;
   }
 

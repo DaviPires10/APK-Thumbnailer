@@ -87,10 +87,8 @@ static void xml_add_child(XmlElement *parent, XmlElement *child) {
   }
 
   if (parent->children_count >= parent->children_capacity) {
-    parent->children_capacity =
-        parent->children_capacity ? parent->children_capacity * 2 : 8;
-    parent->children = realloc(parent->children, parent->children_capacity *
-                                                     sizeof(XmlElement *));
+    parent->children_capacity = parent->children_capacity ? parent->children_capacity * 2 : 8;
+    parent->children = realloc(parent->children, parent->children_capacity * sizeof(XmlElement *));
   }
 
   if (parent->children) {
@@ -98,7 +96,7 @@ static void xml_add_child(XmlElement *parent, XmlElement *child) {
   }
 }
 
-XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool) {
+XmlElement *xml_parse_element(BinaryReader *reader) {
   XmlElement *result = calloc(1, sizeof(XmlElement));
 
   if (!result) {
@@ -132,20 +130,18 @@ XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool) {
     attr.typed_value.data_type = read_u8(reader);
     attr.typed_value.data      = read_u32(reader);
 
-    result->attributes[i].ns        = string_pool_get(pool, attr.ns.index);
-    result->attributes[i].name      = string_pool_get(pool, attr.name.index);
-    result->attributes[i].data_type = attr.typed_value.data_type;
-    result->attributes[i].data      = attr.typed_value.data;
+    result->attributes[i].name.index = attr.name.index;
+    result->attributes[i].data_type  = attr.typed_value.data_type;
+    result->attributes[i].data       = attr.typed_value.data;
   }
 
-  result->ns         = string_pool_get(pool, node.ns.index);
-  result->name       = string_pool_get(pool, node.name.index);
+  result->name.index = node.name.index;
   result->attr_count = node.attr_count;
 
   return result;
 }
 
-XmlElement *xml_parse_document(const uint8_t *data, size_t size) {
+XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out_pool) {
   BinaryReader reader = set_buffer(data, size);
 
   XmlElement *root = NULL;
@@ -173,7 +169,7 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size) {
 
       case RES_XML_START_TAG_TYPE: {
         skip(&reader, 8); // skip line number and comment
-        XmlElement *elem = xml_parse_element(&reader, pool);
+        XmlElement *elem = xml_parse_element(&reader);
 
         if (!elem) {
           goto next_chunk;
@@ -190,9 +186,9 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size) {
           stack_cap        = stack_cap ? stack_cap * 2 : 8;
           XmlElement **tmp = realloc(stack, stack_cap * sizeof(XmlElement *));
           if (!tmp) {
+            string_pool_free(&pool);
             xml_free_element(root);
             free(stack);
-            string_pool_free(&pool);
             return NULL;
           }
           stack = tmp;
@@ -216,23 +212,29 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size) {
     }
   }
   free(stack);
-  string_pool_free(&pool);
+
+  if (out_pool) {
+    *out_pool = pool;
+  } else {
+    string_pool_free(&pool);
+  }
 
   return root;
 }
 
-XmlElement *xml_find_child(XmlElement *element, const char *name) {
+XmlElement *xml_find_child(XmlElement *element, StringPool pool, const char *name) {
   if (!element || !name) {
     return NULL;
   }
 
   for (size_t i = 0; i < element->children_count; ++i) {
-    char *child_name = element->children[i]->name;
+    XmlElement *child = element->children[i];
+    char *child_name  = string_pool_get(pool, child->name.index);
     if (!child_name) {
       continue;
     }
     if (strcmp(child_name, name) == 0) {
-      return element->children[i];
+      return child;
     }
   }
 
@@ -243,14 +245,9 @@ void xml_free_element(XmlElement *elem) {
   if (!elem)
     return;
 
-  free(elem->ns);
-  free(elem->name);
-
-  for (size_t i = 0; i < elem->attr_count; i++) {
-    free(elem->attributes[i].ns);
-    free(elem->attributes[i].name);
+  if (elem->attributes) {
+    free(elem->attributes);
   }
-  free(elem->attributes);
 
   for (size_t i = 0; i < elem->children_count; i++) {
     xml_free_element(elem->children[i]);
@@ -259,12 +256,11 @@ void xml_free_element(XmlElement *elem) {
   free(elem);
 }
 
-XmlAttribute xml_find_attribute(XmlElement *element, const char *name) {
+XmlAttribute xml_find_attribute(XmlElement *element, StringPool pool, const char *name) {
   XmlAttribute result = {
-      .name      = NULL,
-      .ns        = NULL,
-      .data_type = TYPE_NULL,
-      .data      = UINT32_MAX,
+      .name.index = UINT32_MAX,
+      .data_type  = TYPE_NULL,
+      .data       = UINT32_MAX,
   };
 
   if (!element || !name) {
@@ -272,7 +268,8 @@ XmlAttribute xml_find_attribute(XmlElement *element, const char *name) {
   }
 
   for (size_t i = 0; i < element->attr_count; ++i) {
-    char *attr_name = element->attributes[i].name;
+    XmlAttribute attr = element->attributes[i];
+    char *attr_name   = string_pool_get(pool, attr.name.index);
     if (!attr_name) {
       continue;
     }
@@ -298,7 +295,7 @@ char *xml_parse_attribute(XmlAttribute attr, StringPool pool) {
     case TYPE_STRING: {
       char *s = string_pool_get(pool, data);
       if (s) {
-        return s;
+        return strdup(s);
       } else {
         return strdup("");
       }
@@ -306,7 +303,8 @@ char *xml_parse_attribute(XmlAttribute attr, StringPool pool) {
     }
 
     case TYPE_FLOAT: {
-      float ret = *(float *)(&data);
+      float ret;
+      memcpy(&ret, &data, sizeof(ret));
       sprintf(result, "%g", ret);
       break;
     }

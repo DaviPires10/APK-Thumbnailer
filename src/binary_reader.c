@@ -61,8 +61,7 @@ uint8_t read_u8(BinaryReader *reader) {
 uint16_t read_u16(BinaryReader *reader) {
   if (reader->pos + 2 > reader->size)
     return 0;
-  uint16_t val =
-      reader->data[reader->pos] | (reader->data[reader->pos + 1] << 8);
+  uint16_t val = reader->data[reader->pos] | (reader->data[reader->pos + 1] << 8);
   reader->pos += 2;
   return val;
 }
@@ -70,10 +69,8 @@ uint16_t read_u16(BinaryReader *reader) {
 uint32_t read_u32(BinaryReader *reader) {
   if (reader->pos + 4 > reader->size)
     return 0;
-  uint32_t val = reader->data[reader->pos] |
-                 (reader->data[reader->pos + 1] << 8) |
-                 (reader->data[reader->pos + 2] << 16) |
-                 (reader->data[reader->pos + 3] << 24);
+  uint32_t val = reader->data[reader->pos] | (reader->data[reader->pos + 1] << 8) |
+                 (reader->data[reader->pos + 2] << 16) | (reader->data[reader->pos + 3] << 24);
   reader->pos += 4;
   return val;
 }

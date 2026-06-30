@@ -131,13 +131,17 @@ void string_pool_append(StringPool *pool, char *str) {
     return;
   }
 
+  if (string_pool_get_index(*pool, str) != UINT32_MAX) {
+    return;
+  }
+
   if (pool->count >= pool->capacity) {
     pool->capacity = pool->capacity ? pool->capacity * 2 : 8;
     pool->strings  = realloc(pool->strings, pool->capacity * sizeof(char *));
   }
 
   if (pool->strings) {
-    pool->strings[pool->count++] = str;
+    pool->strings[pool->count++] = strdup(str);
   }
 }
 
@@ -145,7 +149,7 @@ char *string_pool_get(StringPool pool, size_t index) {
   if (index >= pool.count) {
     return NULL;
   }
-  return strdup(pool.strings[index]);
+  return pool.strings[index];
 }
 
 uint32_t string_pool_get_index(StringPool pool, const char *str) {

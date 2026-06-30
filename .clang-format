@@ -1,5 +1,5 @@
 BasedOnStyle: LLVM
-ColumnLimit: 80
+ColumnLimit: 100
 UseTab: Never
 
 # Alignment Options
