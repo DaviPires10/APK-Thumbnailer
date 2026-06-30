@@ -227,13 +227,14 @@ XmlElement *xml_find_child(XmlElement *element, StringPool pool, const char *nam
     return NULL;
   }
 
+  uint32_t name_index = string_pool_get_index(pool, name);
+  if (name_index == UINT32_MAX) {
+    return NULL;
+  }
+
   for (size_t i = 0; i < element->children_count; ++i) {
     XmlElement *child = element->children[i];
-    char *child_name  = string_pool_get(pool, child->name.index);
-    if (!child_name) {
-      continue;
-    }
-    if (strcmp(child_name, name) == 0) {
+    if (child->name.index == name_index) {
       return child;
     }
   }
@@ -267,13 +268,14 @@ XmlAttribute xml_find_attribute(XmlElement *element, StringPool pool, const char
     return result;
   }
 
+  uint32_t name_index = string_pool_get_index(pool, name);
+  if (name_index == UINT32_MAX) {
+    return result;
+  }
+
   for (size_t i = 0; i < element->attr_count; ++i) {
     XmlAttribute attr = element->attributes[i];
-    char *attr_name   = string_pool_get(pool, attr.name.index);
-    if (!attr_name) {
-      continue;
-    }
-    if (strcmp(attr_name, name) == 0) {
+    if (attr.name.index == name_index) {
       result = element->attributes[i];
       break;
     }
