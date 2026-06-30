@@ -30,6 +30,30 @@ struct ResStringPool_header {
   uint32_t styles_start;
 };
 
+// FNV-1a Hash Algorithm
+static uint32_t hash_string(const char *str) {
+  uint32_t hash = 2166136261u;
+  while (*str) {
+    hash ^= (unsigned char)*str++;
+    hash *= 16777619u;
+  }
+  return hash;
+}
+
+static void
+hash_table_insert(StringPoolEntry *table, size_t table_capacity, const char *key, uint32_t index) {
+  if (table_capacity == 0 || !key)
+    return;
+
+  uint32_t slot = hash_string(key) % table_capacity;
+  while (table[slot].key != NULL) {
+    ++slot;
+    slot %= table_capacity;
+  }
+  table[slot].key   = key;
+  table[slot].index = index;
+}
+
 static int decode_utf8_length(BinaryReader *reader) {
   uint8_t len = read_u8(reader);
   if (len & 0x80) {
@@ -120,8 +144,22 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   }
   free(offsets);
 
-  result.strings = strings;
-  result.count   = pool.strings_count;
+  result.strings  = strings;
+  result.count    = pool.strings_count;
+  result.capacity = pool.strings_count;
+
+  // Build the initial hash map lookup cache from parsed data
+  if (result.count > 0) {
+    result.table_capacity = result.capacity * 2;
+    result.hash_table     = calloc(result.table_capacity, sizeof(StringPoolEntry));
+    if (result.hash_table) {
+      for (size_t i = 0; i < result.count; ++i) {
+        if (result.strings[i]) {
+          hash_table_insert(result.hash_table, result.table_capacity, result.strings[i], i);
+        }
+      }
+    }
+  }
 
   return result;
 }
@@ -138,10 +176,31 @@ void string_pool_append(StringPool *pool, char *str) {
   if (pool->count >= pool->capacity) {
     pool->capacity = pool->capacity ? pool->capacity * 2 : 8;
     pool->strings  = realloc(pool->strings, pool->capacity * sizeof(char *));
+
+    // Scale and rehash the lookup cache to prevent collision degradation
+    size_t new_table_capacity  = pool->capacity * 2;
+    StringPoolEntry *new_table = calloc(new_table_capacity, sizeof(StringPoolEntry));
+    if (new_table) {
+      for (size_t i = 0; i < pool->count; ++i) {
+        if (pool->strings[i]) {
+          hash_table_insert(new_table, new_table_capacity, pool->strings[i], i);
+        }
+      }
+      free(pool->hash_table);
+      pool->hash_table     = new_table;
+      pool->table_capacity = new_table_capacity;
+    }
   }
 
   if (pool->strings) {
-    pool->strings[pool->count++] = strdup(str);
+    char *dup_str              = strdup(str);
+    pool->strings[pool->count] = dup_str;
+
+    // Add new string record to the map cache
+    if (pool->hash_table && dup_str) {
+      hash_table_insert(pool->hash_table, pool->table_capacity, dup_str, pool->count);
+    }
+    pool->count++;
   }
 }
 
@@ -153,27 +212,56 @@ char *string_pool_get(StringPool pool, size_t index) {
 }
 
 uint32_t string_pool_get_index(StringPool pool, const char *str) {
-  if (!pool.strings || !str) {
+  if (!pool.strings || !pool.hash_table || !str || pool.table_capacity == 0) {
     return UINT32_MAX;
   }
 
-  for (size_t i = 0; i < pool.count; ++i) {
-    if (strcmp(pool.strings[i], str) == 0) {
-      return i;
+  uint32_t slot = hash_string(str) % pool.table_capacity;
+
+  while (pool.hash_table[slot].key != NULL) {
+    if (strcmp(pool.hash_table[slot].key, str) == 0) {
+      return pool.hash_table[slot].index;
     }
+    ++slot;
+    slot %= pool.table_capacity;
   }
 
   return UINT32_MAX;
 }
 
+void string_pool_get_indices_batch(StringPool pool,
+                                   const char **strings,
+                                   size_t count,
+                                   uint32_t *out_indices) {
+  if (!out_indices)
+    return;
+
+  for (size_t i = 0; i < count; ++i) {
+    if (!strings[i]) {
+      out_indices[i] = UINT32_MAX;
+      continue;
+    }
+    out_indices[i] = string_pool_get_index(pool, strings[i]);
+  }
+}
+
 void string_pool_free(StringPool *pool) {
-  if (!pool || !pool->strings) {
+  if (!pool) {
     return;
   }
-  for (size_t i = 0; i < pool->count; ++i) {
-    free(pool->strings[i]);
+
+  if (pool->strings) {
+    for (size_t i = 0; i < pool->count; ++i) {
+      free(pool->strings[i]);
+    }
+    free(pool->strings);
+    pool->strings = NULL;
   }
-  free(pool->strings);
-  pool->strings = NULL;
-  pool->count   = 0;
+  if (pool->hash_table) {
+    free(pool->hash_table);
+    pool->hash_table = NULL;
+  }
+  pool->count          = 0;
+  pool->capacity       = 0;
+  pool->table_capacity = 0;
 }

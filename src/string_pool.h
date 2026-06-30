@@ -22,9 +22,17 @@
 #include "binary_reader.h"
 
 typedef struct {
+  const char *key;
+  uint32_t index;
+} StringPoolEntry;
+
+typedef struct {
   char **strings;
   size_t count;
   size_t capacity;
+
+  StringPoolEntry *hash_table;
+  size_t table_capacity;
 } StringPool;
 
 struct ResStringPool_ref {
@@ -35,6 +43,10 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start);
 void string_pool_append(StringPool *pool, char *str);
 char *string_pool_get(StringPool pool, size_t index);
 uint32_t string_pool_get_index(StringPool pool, const char *str);
+void string_pool_get_indices_batch(StringPool pool,
+                                   const char **strings,
+                                   size_t count,
+                                   uint32_t *out_indices);
 void string_pool_free(StringPool *pool);
 
 #endif
