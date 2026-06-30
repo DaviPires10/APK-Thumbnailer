@@ -23,13 +23,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-StringPool get_application_icon_resource_path(const uint8_t *data,
-                                              size_t size,
-                                              uint32_t reference_id) {
+StringPool get_resource(const uint8_t *data, size_t size, uint32_t id) {
   BinaryReader reader = set_buffer(data, size);
 
-  uint32_t res_type  = (reference_id >> 16) & 0xff;
-  uint32_t res_index = reference_id & 0xffff;
+  uint32_t res_type  = (id >> 16) & 0xff;
+  uint32_t res_index = id & 0xffff;
 
   StringPool pool  = {0};
   StringPool icons = {0};

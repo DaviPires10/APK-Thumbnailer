@@ -147,34 +147,23 @@ int main(int argc, char **argv) {
   // get icon_id from AndroidManifest.xml
   uint32_t icon_id = UINT32_MAX;
 
-  manifest = xml_parse_document(manifest_data, manifest_size);
-  if (!manifest) {
-    fprintf(stderr, "Failed to parse AndroidManifest.xml\n");
-    goto cleanup;
-  }
-
+  manifest                = xml_parse_document(manifest_data, manifest_size);
   XmlElement *application = xml_find_child(manifest, "application");
-  if (!application) {
-    fprintf(stderr,
-            "Failed to find application tag inside AndroidManifest.xml\n");
-    goto cleanup;
-  }
-
-  XmlAttribute *icon = xml_find_attribute(application, "icon");
-  if (!icon || icon->data == UINT32_MAX) {
+  XmlAttribute icon       = xml_find_attribute(application, "icon");
+  if (icon.data == UINT32_MAX) {
     fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
     goto cleanup;
   }
-  icon_id = icon->data;
-
-  if (verbose) {
-    printf("Found target Icon Reference ID: %#X\n", icon_id);
-  }
+  icon_id = icon.data;
 
   xml_free_element(manifest);
   free(manifest_data);
   manifest      = NULL;
   manifest_data = NULL;
+
+  if (verbose) {
+    printf("Found target Icon Reference ID: %#X\n", icon_id);
+  }
 
   size_t resources_size;
   resources_data = apk_extract_file(za, "resources.arsc", &resources_size);
@@ -184,8 +173,7 @@ int main(int argc, char **argv) {
   }
 
   // get icon_paths from resources.arsc
-  icons = get_application_icon_resource_path(resources_data, resources_size,
-                                             icon_id);
+  icons = get_resource(resources_data, resources_size, icon_id);
   if (!icons.strings) {
     fprintf(stderr,
             "Failed to resolve ID 0x%08X to any file paths in resources.arsc\n",

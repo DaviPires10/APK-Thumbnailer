@@ -38,6 +38,7 @@ typedef struct XmlElement {
 
   char *ns;
   char *name;
+
   size_t attr_count;
   XmlAttribute *attributes;
 
@@ -51,6 +52,6 @@ void xml_free_element(XmlElement *element);
 XmlElement *xml_find_child(XmlElement *element, const char *name);
 XmlElement *xml_parse_document(const uint8_t *data, size_t size);
 
-XmlAttribute *xml_find_attribute(XmlElement *element, const char *name);
-
+XmlAttribute xml_find_attribute(XmlElement *element, const char *name);
+char *xml_parse_attribute(XmlAttribute attr, StringPool pool);
 #endif
