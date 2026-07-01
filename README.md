@@ -82,7 +82,7 @@ apk-thumbnailer -i app.apk -o thumbnail.png -s 256
 
 ## Limitations
 
-- Vector drawables (`.xml`) are not currently supported
+- Vector drawables (`.xml`) are not currently supported (WIP)
 - APK split resources are not supported
 
 Most APKs still include high-resolution PNG fallback icons, so compatibility remains good in practice.
