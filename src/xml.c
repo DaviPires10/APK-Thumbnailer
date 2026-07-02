@@ -18,9 +18,7 @@
 
 #include "xml.h"
 
-#include "binary_reader.h"
 #include "chunk.h"
-#include "string_pool.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -291,7 +289,7 @@ char *xml_parse_attribute(XmlAttribute attr, StringPool pool) {
 
   switch (type) {
     case TYPE_REFERENCE:
-      snprintf(result, sizeof(result), "@res%#08X", data);
+      snprintf(result, sizeof(result), "url(#res%#08X)", data);
       break;
 
     case TYPE_STRING: {

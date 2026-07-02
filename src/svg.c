@@ -18,10 +18,9 @@
 
 #include "svg.h"
 
-#include "src/string_pool.h"
-#include "src/xml.h"
-
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 typedef enum {
   TAG_VECTOR,
@@ -33,12 +32,12 @@ typedef enum {
   TAG_UNKNOWN,
 } Tag;
 
-#define TAG_COUNT TAG_UNKNOWN
+typedef struct {
+  const char *xml_name;
+  const char *svg_name;
+} SvgMap;
 
-static const struct {
-  const char *xml_tag;
-  const char *svg_tag;
-} tag_map[] = {
+static const SvgMap tag_map[] = {
     {"vector",    "svg"      },
     {"path",      "path"     },
     {"group",     "g"        },
@@ -46,12 +45,9 @@ static const struct {
     {"gradient",  NULL       },
     {"item",      "stop"     },
 };
-static const size_t tag_map_size = sizeof(tag_map) / sizeof(tag_map[0]);
+#define TAG_COUNT (sizeof(tag_map) / sizeof(tag_map[0]))
 
-static const struct {
-  const char *xml_attr;
-  const char *svg_attr;
-} path_attrs[] = {
+static const SvgMap path_attrs[] = {
     {"fillColor",        "fill"             },
     {"fillType",         "fill-rule"        },
     {"pathData",         "d"                },
@@ -62,37 +58,96 @@ static const struct {
     {"strokeWidth",      "stroke-width"     },
 };
 
-static const struct {
-  const char *xml_attr;
-  const char *svg_attr;
-} linear_gradient_attrs[] = {
+static const SvgMap linear_gradient_attrs[] = {
     {"startX", "x1"},
     {"startY", "y1"},
     {"endX",   "x2"},
     {"endY",   "y2"},
 };
 
-static const struct {
-  const char *xml_attr;
-  const char *svg_attr;
-} radial_gradient_attrs[] = {
+static const SvgMap radial_gradient_attrs[] = {
     {"centerX",        "cx"},
     {"centerY",        "cy"},
     {"gradientRadius", "r" },
 };
 
-static void svg_parse_vector(XmlElement *element, StringPool pool, StringPool resource_pool);
-static void svg_parse_path(XmlElement *element, StringPool pool, StringPool resource_pool);
-static void svg_parse_group(XmlElement *element, StringPool pool, StringPool resource_pool);
-static void svg_parse_gradient(XmlElement *element, StringPool pool, StringPool resource_pool);
-static void svg_parse_item(XmlElement *element, StringPool pool, StringPool resource_pool);
+static const SvgMap item_attrs[] = {
+    {"offset", "offset"      },
+    {"color",  "stop-color"  },
+    {"alpha",  "stop-opacity"},
+};
+
+static void write_attr(FILE *fp,
+                       XmlElement *elem,
+                       StringPool pool,
+                       StringPool resource_pool,
+                       const char *xml_name,
+                       const char *svg_name) {
+  XmlAttribute attr = xml_find_attribute(elem, pool, xml_name);
+  if (attr.name.index == UINT32_MAX) {
+    return;
+  }
+  char *value = xml_parse_attribute(attr, resource_pool);
+  fprintf(fp, " %s=\"%s\"", svg_name, value);
+  free(value);
+}
+
+static void write_attr_fmt(FILE *fp, const char *restrict svg_attr, const char *restrict fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  fprintf(fp, " %s=\"", svg_attr);
+  vfprintf(fp, fmt, args);
+  fprintf(fp, "\"");
+  va_end(args);
+}
+
+static void write_attr_map(FILE *fp,
+                           XmlElement *element,
+                           StringPool pool,
+                           StringPool resource_pool,
+                           const size_t map_count,
+                           const SvgMap map[map_count]) {
+
+  for (size_t i = 0; i < map_count; ++i) {
+    XmlAttribute attr = xml_find_attribute(element, pool, map[i].xml_name);
+    if (attr.name.index == UINT32_MAX) {
+      continue;
+    }
+    char *value = xml_parse_attribute(attr, resource_pool);
+    fprintf(fp, " %s=\"%s\"", map[i].svg_name, value);
+    free(value);
+  }
+}
+
+static void
+svg_parse_vector(FILE *fp, XmlElement *elem, StringPool pool, StringPool resource_pool) {
+  fprintf(fp, " xmlns=\"http://www.w3.org/2000/svg\"");
+
+  write_attr(fp, elem, pool, resource_pool, "width", "width");
+  write_attr(fp, elem, pool, resource_pool, "height", "height");
+
+  XmlAttribute vw = xml_find_attribute(elem, pool, "viewportWidth");
+  XmlAttribute vh = xml_find_attribute(elem, pool, "viewportHeight");
+  char *w         = xml_parse_attribute(vw, resource_pool);
+  char *h         = xml_parse_attribute(vh, resource_pool);
+  write_attr_fmt(fp, " viewBox", "0 0 %s %s", w, h);
+  free(w);
+  free(h);
+
+  write_attr(fp, elem, pool, resource_pool, "alpha", "opacity");
+}
+
+static void
+svg_parse_group(FILE *fp, XmlElement *element, StringPool pool, StringPool resource_pool) {
+  // TODO: Handle rotation, scale, translation
+}
 
 static Tag svg_element_get_tag(XmlElement *element, uint32_t *tag_indices) {
   if (!element || !tag_indices) {
     return TAG_UNKNOWN;
   }
 
-  for (size_t i = 0; i < tag_map_size; ++i) {
+  for (size_t i = 0; i < TAG_COUNT; ++i) {
     if (element->name.index == tag_indices[i]) {
       return i;
     }
@@ -100,6 +155,7 @@ static Tag svg_element_get_tag(XmlElement *element, uint32_t *tag_indices) {
 
   return TAG_UNKNOWN;
 }
+
 static void svg_write_tag(FILE *fp, uint32_t gradient_type, Tag element_tag) {
   if (element_tag == TAG_GRADIENT) {
     if (gradient_type == 0) {
@@ -108,7 +164,7 @@ static void svg_write_tag(FILE *fp, uint32_t gradient_type, Tag element_tag) {
       fprintf(fp, "radialGradient");
     }
   } else {
-    fprintf(fp, "%s", tag_map[element_tag].svg_tag);
+    fprintf(fp, "%s", tag_map[element_tag].svg_name);
   }
 }
 
@@ -132,24 +188,37 @@ void svg_write_element(FILE *fp,
 
   switch (element_tag) {
     case TAG_VECTOR:
-      svg_parse_vector(element, pool, resource_pool);
+      svg_parse_vector(fp, element, pool, resource_pool);
+      break;
+
+    case TAG_CLIP_PATH:
+      write_attr(fp, element, pool, resource_pool, "pathData", "d");
       break;
 
     case TAG_PATH:
-    case TAG_CLIP_PATH:
-      svg_parse_path(element, pool, resource_pool);
+      write_attr_map(fp, element, pool, resource_pool, sizeof(path_attrs) / sizeof(path_attrs[0]),
+                     path_attrs);
       break;
 
     case TAG_GROUP:
-      svg_parse_group(element, pool, resource_pool);
+      svg_parse_group(fp, element, pool, resource_pool);
       break;
 
     case TAG_GRADIENT: {
-      svg_parse_gradient(element, pool, resource_pool);
+      if (gradient_type == 0) {
+        write_attr_map(fp, element, pool, resource_pool,
+                       sizeof(linear_gradient_attrs) / sizeof(linear_gradient_attrs[0]),
+                       linear_gradient_attrs);
+      } else if (gradient_type == 1) {
+        write_attr_map(fp, element, pool, resource_pool,
+                       sizeof(radial_gradient_attrs) / sizeof(radial_gradient_attrs[0]),
+                       radial_gradient_attrs);
+      }
     } break;
 
     case TAG_ITEM:
-      svg_parse_item(element, pool, resource_pool);
+      write_attr_map(fp, element, pool, resource_pool, sizeof(item_attrs) / sizeof(item_attrs[0]),
+                     item_attrs);
       break;
 
     default:
@@ -177,13 +246,13 @@ void svg_parse_document(FILE *fp, XmlElement *root, StringPool pool, StringPool 
     return;
   }
 
-  uint32_t tag_indices[tag_map_size];
-  const char *tags[tag_map_size];
+  uint32_t tag_indices[TAG_COUNT];
+  const char *tags[TAG_COUNT];
 
-  for (size_t i = 0; i < tag_map_size; ++i) {
-    tags[i] = tag_map[i].xml_tag;
+  for (size_t i = 0; i < TAG_COUNT; ++i) {
+    tags[i] = tag_map[i].xml_name;
   }
-  string_pool_get_indices_batch(pool, tags, tag_map_size, tag_indices);
+  string_pool_get_indices_batch(pool, tags, TAG_COUNT, tag_indices);
 
   Tag root_tag = svg_element_get_tag(root, tag_indices);
 
