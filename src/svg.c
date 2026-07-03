@@ -31,6 +31,80 @@ typedef struct {
   const char *svg_name;
 } SvgMap;
 
+static const float RADIX_MULTS[4] = {
+    1.0f / (1 << 8),
+    1.0f / (1 << 15),
+    1.0f / (1 << 23),
+    1.0f / (1 << 31),
+};
+
+static SvgValue svg_parse_value(XmlAttribute attr, StringPool pool) {
+
+  SvgValue value = {0};
+
+  value.type    = attr.data_type;
+  uint32_t data = attr.data;
+
+  switch (value.type) {
+    case TYPE_STRING: {
+      char *s           = string_pool_get(pool, data);
+      value.data.string = s ? strdup(s) : strdup("");
+      break;
+    }
+
+    case TYPE_FLOAT: {
+      float *ret = &value.data.floating;
+      memcpy(ret, &data, sizeof(float));
+      break;
+    }
+
+    case TYPE_REFERENCE:
+    case TYPE_INT_DEC:
+    case TYPE_INT_HEX:
+      value.data.integer = data;
+      break;
+
+    case TYPE_INT_BOOLEAN:
+      value.data.string = data ? strdup("true") : strdup("false");
+      break;
+
+    case TYPE_DIMENSION: {
+      int radix          = (data >> 4) & 0x3;
+      int mantissa       = data & 0xFFFFFF00;
+      float ret          = mantissa * RADIX_MULTS[radix];
+      value.data.integer = ret;
+      break;
+    }
+
+    case TYPE_FRACTION: {
+      int radix          = (data >> 4) & 0x3;
+      int mantissa       = data & 0xFFFFFF00;
+      float ret          = (mantissa * RADIX_MULTS[radix]) * 100.0f;
+      value.data.integer = ret;
+      break;
+    }
+
+    case TYPE_INT_COLOR_ARGB8: {
+      // Svg's use RGBA instead of ARGB
+      uint32_t alpha     = data >> 24;
+      uint32_t rgb       = data << 8;
+      uint32_t ret       = rgb | alpha;
+      value.data.integer = ret;
+      break;
+    }
+
+    case TYPE_INT_COLOR_RGB8:
+      value.data.integer = data & 0x00FFFFFF;
+      break;
+
+    default:
+      value.data.integer = 0;
+      value.type         = TYPE_NULL;
+  }
+
+  return value;
+}
+
 static const char *tags[] = {
     "group", "path", "clip-path", "item", "gradient",
 };
@@ -138,9 +212,7 @@ SvgAttribute svg_parse_group(XmlElement *elem, StringPool pool) {
   for (size_t i = 0; i < countof(target_attrs); ++i) {
     XmlAttribute attr = xml_find_attribute(elem, pool, target_attrs[i]);
     if (attr.data != UINT32_MAX) {
-      char *value    = xml_parse_attribute(attr, pool);
-      props_array[i] = atof(value);
-      free(value);
+      props_array[i] = svg_parse_value(attr, pool).data.floating;
     }
   }
 
@@ -169,7 +241,8 @@ SvgAttribute svg_parse_group(XmlElement *elem, StringPool pool) {
         snprintf(&buffer[len], sizeof(buffer) - len, "scale(%g, %g)", props.scale_x, props.scale_y);
   }
 
-  result.data = len > 0 ? strdup(buffer) : strdup("");
+  result.value.data.string = len > 0 ? strdup(buffer) : strdup("");
+  result.value.type        = TYPE_STRING;
 
   return result;
 }
@@ -180,23 +253,23 @@ SvgAttribute svg_parse_attribute(XmlAttribute attr, StringPool pool, SvgTag elem
   switch (elem_tag) {
     case TAG_PATH:
     case TAG_CLIP_PATH:
-      result.name = map_get(attr.name.index, pool, countof(path_attrs), path_attrs);
-      result.data = xml_parse_attribute(attr, pool);
+      result.name  = map_get(attr.name.index, pool, countof(path_attrs), path_attrs);
+      result.value = svg_parse_value(attr, pool);
       break;
 
     case TAG_LINEAR_GRADIENT:
-      result.name = map_get(attr.name.index, pool, countof(linear_grad_attrs), linear_grad_attrs);
-      result.data = xml_parse_attribute(attr, pool);
+      result.name  = map_get(attr.name.index, pool, countof(linear_grad_attrs), linear_grad_attrs);
+      result.value = svg_parse_value(attr, pool);
       break;
 
     case TAG_RADIAL_GRADIENT:
-      result.name = map_get(attr.name.index, pool, countof(radial_grad_attrs), radial_grad_attrs);
-      result.data = xml_parse_attribute(attr, pool);
+      result.name  = map_get(attr.name.index, pool, countof(radial_grad_attrs), radial_grad_attrs);
+      result.value = svg_parse_value(attr, pool);
       break;
 
     case TAG_ITEM:
-      result.name = map_get(attr.name.index, pool, countof(item_attrs), item_attrs);
-      result.data = xml_parse_attribute(attr, pool);
+      result.name  = map_get(attr.name.index, pool, countof(item_attrs), item_attrs);
+      result.value = svg_parse_value(attr, pool);
       break;
 
     default:
@@ -221,7 +294,7 @@ SvgElement svg_parse_element(XmlElement *elem, StringPool pool, uint32_t *tag_in
     if (result.attributes) {
       for (size_t i = 0; i < elem->attr_count; ++i) {
         SvgAttribute attr = svg_parse_attribute(elem->attributes[i], pool, result.tag);
-        if (attr.data != NULL) {
+        if (attr.value.type != TYPE_NULL) {
           result.attributes[result.attr_count++] = attr;
         }
       }
@@ -277,10 +350,10 @@ SvgDocument svg_parse_xml(XmlElement *root, StringPool pool) {
   XmlAttribute view_height = xml_find_attribute(root, pool, "viewportHeight");
 
   doc.ns          = "http://www.w3.org/2000/svg";
-  doc.width       = atof(xml_parse_attribute(width, pool));
-  doc.height      = atof(xml_parse_attribute(height, pool));
-  doc.view_width  = atof(xml_parse_attribute(view_width, pool));
-  doc.view_height = atof(xml_parse_attribute(view_height, pool));
+  doc.width       = svg_parse_value(width, pool).data.floating;
+  doc.height      = svg_parse_value(height, pool).data.floating;
+  doc.view_width  = svg_parse_value(view_width, pool).data.floating;
+  doc.view_height = svg_parse_value(view_height, pool).data.floating;
 
   doc.vector_count = root->children_count;
   doc.vector       = realloc(doc.vector, doc.vector_count * sizeof(SvgElement));

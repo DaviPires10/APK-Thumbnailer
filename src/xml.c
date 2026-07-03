@@ -53,13 +53,6 @@ struct ResXMLTree_attribute {
   struct Res_value typed_value;
 };
 
-static const float RADIX_MULTS[4] = {
-    1.0f / (1 << 8),
-    1.0f / (1 << 15),
-    1.0f / (1 << 23),
-    1.0f / (1 << 31),
-};
-
 static void xml_add_child(XmlElement *parent, XmlElement *child) {
   if (!parent || !child) {
     return;
@@ -269,79 +262,4 @@ XmlAttribute xml_find_attribute(XmlElement *elem, StringPool pool, const char *n
   }
 
   return result;
-}
-
-char *xml_parse_attribute(XmlAttribute attr, StringPool pool) {
-  uint8_t type  = attr.data_type;
-  uint32_t data = attr.data;
-  char result[64];
-
-  switch (type) {
-    case TYPE_REFERENCE:
-      snprintf(result, sizeof(result), "url(#res%#08X)", data);
-      break;
-
-    case TYPE_STRING: {
-      char *s = string_pool_get(pool, data);
-      if (s) {
-        return strdup(s);
-      } else {
-        return strdup("");
-      }
-      break;
-    }
-
-    case TYPE_FLOAT: {
-      float ret;
-      memcpy(&ret, &data, sizeof(ret));
-      sprintf(result, "%g", ret);
-      break;
-    }
-
-    case TYPE_INT_DEC:
-      sprintf(result, "%d", data);
-      break;
-
-    case TYPE_INT_HEX:
-      sprintf(result, "%#X", data);
-      break;
-
-    case TYPE_INT_BOOLEAN:
-      sprintf(result, data ? "true" : "false");
-      break;
-
-    case TYPE_DIMENSION: {
-      int radix = (data >> 4) & 0x3;
-      int value = (int)(data & 0xFFFFFF00);
-      float ret = value * RADIX_MULTS[radix];
-      snprintf(result, sizeof(result), "%g", ret);
-      break;
-    }
-
-    case TYPE_FRACTION: {
-      int radix = (data >> 4) & 0x3;
-      int value = (int)(data & 0xFFFFFF00);
-      float ret = (value * RADIX_MULTS[radix]) * 100.0f;
-      snprintf(result, sizeof(result), "%g%%", ret);
-      break;
-    }
-
-    case TYPE_INT_COLOR_ARGB8: {
-      // Svg's use RGBA instead of ARGB
-      uint32_t alpha = data >> 24;
-      uint32_t rgb   = data << 8;
-      uint32_t ret   = rgb | alpha;
-      sprintf(result, "#%08X", ret);
-      break;
-    }
-
-    case TYPE_INT_COLOR_RGB8:
-      sprintf(result, "#%06X", data & 0x00FFFFFF);
-      break;
-
-    default:
-      return strdup("");
-  }
-
-  return strdup(result);
 }
