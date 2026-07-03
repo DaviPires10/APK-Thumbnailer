@@ -24,25 +24,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum : uint8_t {
-  TYPE_NULL              = 0x00,
-  TYPE_REFERENCE         = 0x01,
-  TYPE_ATTRIBUTE         = 0x02,
-  TYPE_STRING            = 0x03,
-  TYPE_FLOAT             = 0x04,
-  TYPE_DIMENSION         = 0x05,
-  TYPE_FRACTION          = 0x06,
-  TYPE_DYNAMIC_REFERENCE = 0x07,
-  TYPE_DYNAMIC_ATTRIBUTE = 0x08,
-  TYPE_INT_DEC           = 0x10,
-  TYPE_INT_HEX           = 0x11,
-  TYPE_INT_BOOLEAN       = 0x12,
-  TYPE_INT_COLOR_ARGB8   = 0x1c,
-  TYPE_INT_COLOR_RGB8    = 0x1d,
-  TYPE_INT_COLOR_ARGB4   = 0x1e,
-  TYPE_INT_COLOR_RGB4    = 0x1f,
-};
-
 struct ResTable_ref {
   uint32_t ident;
 };
@@ -220,8 +201,8 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
   return root;
 }
 
-XmlElement *xml_find_child(XmlElement *element, StringPool pool, const char *name) {
-  if (!element || !name) {
+XmlElement *xml_find_child(XmlElement *elem, StringPool pool, const char *name) {
+  if (!elem || !name) {
     return NULL;
   }
 
@@ -230,14 +211,22 @@ XmlElement *xml_find_child(XmlElement *element, StringPool pool, const char *nam
     return NULL;
   }
 
-  for (size_t i = 0; i < element->children_count; ++i) {
-    XmlElement *child = element->children[i];
+  for (size_t i = 0; i < elem->children_count; ++i) {
+    XmlElement *child = elem->children[i];
     if (child->name.index == name_index) {
       return child;
     }
   }
 
   return NULL;
+}
+
+bool xml_element_has_name(XmlElement *elem, StringPool pool, const char *name) {
+  if (elem->name.index == UINT32_MAX) {
+    return false;
+  }
+
+  return (elem->name.index == string_pool_get_index(pool, name));
 }
 
 void xml_free_element(XmlElement *elem) {
@@ -255,14 +244,14 @@ void xml_free_element(XmlElement *elem) {
   free(elem);
 }
 
-XmlAttribute xml_find_attribute(XmlElement *element, StringPool pool, const char *name) {
+XmlAttribute xml_find_attribute(XmlElement *elem, StringPool pool, const char *name) {
   XmlAttribute result = {
       .name.index = UINT32_MAX,
       .data_type  = TYPE_NULL,
       .data       = UINT32_MAX,
   };
 
-  if (!element || !name) {
+  if (!elem || !name) {
     return result;
   }
 
@@ -271,10 +260,10 @@ XmlAttribute xml_find_attribute(XmlElement *element, StringPool pool, const char
     return result;
   }
 
-  for (size_t i = 0; i < element->attr_count; ++i) {
-    XmlAttribute attr = element->attributes[i];
+  for (size_t i = 0; i < elem->attr_count; ++i) {
+    XmlAttribute attr = elem->attributes[i];
     if (attr.name.index == name_index) {
-      result = element->attributes[i];
+      result = elem->attributes[i];
       break;
     }
   }
@@ -323,7 +312,7 @@ char *xml_parse_attribute(XmlAttribute attr, StringPool pool) {
 
     case TYPE_DIMENSION: {
       int radix = (data >> 4) & 0x3;
-      int value = (int)(data >> 8);
+      int value = (int)(data & 0xFFFFFF00);
       float ret = value * RADIX_MULTS[radix];
       snprintf(result, sizeof(result), "%g", ret);
       break;
@@ -331,7 +320,7 @@ char *xml_parse_attribute(XmlAttribute attr, StringPool pool) {
 
     case TYPE_FRACTION: {
       int radix = (data >> 4) & 0x3;
-      int value = (int)(data >> 8);
+      int value = (int)(data & 0xFFFFFF00);
       float ret = (value * RADIX_MULTS[radix]) * 100.0f;
       snprintf(result, sizeof(result), "%g%%", ret);
       break;
@@ -339,8 +328,8 @@ char *xml_parse_attribute(XmlAttribute attr, StringPool pool) {
 
     case TYPE_INT_COLOR_ARGB8: {
       // Svg's use RGBA instead of ARGB
-      uint32_t alpha = data >> 6;
-      uint32_t rgb   = data << 2;
+      uint32_t alpha = data >> 24;
+      uint32_t rgb   = data << 8;
       uint32_t ret   = rgb | alpha;
       sprintf(result, "#%08X", ret);
       break;

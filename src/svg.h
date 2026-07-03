@@ -21,8 +21,53 @@
 
 #include "xml.h"
 
-#include <stdio.h>
+#include <stddef.h>
 
-void svg_parse_document(FILE *fp, XmlElement *root, StringPool pool, StringPool resource_pool);
+typedef enum {
+  TAG_GROUP,
+  TAG_PATH,
+  TAG_CLIP_PATH,
+  TAG_ITEM,
+  TAG_LINEAR_GRADIENT,
+  TAG_RADIAL_GRADIENT,
+  TAG_UNKNOWN,
+} SvgTag;
 
+typedef struct {
+  const char *name;
+  const char *data;
+} SvgAttribute;
+
+typedef struct SvgElement {
+  SvgTag tag;
+  const char *id;
+
+  size_t attr_count;
+  SvgAttribute *attributes;
+
+  size_t children_count;
+  struct SvgElement **children;
+} SvgElement;
+
+typedef struct {
+  const char *ns;
+
+  float width;
+  float height;
+
+  float view_width;
+  float view_height;
+
+  size_t defs_count;
+  size_t defs_capacity;
+  SvgElement *defs;
+
+  size_t vector_count;
+  SvgElement *vector;
+} SvgDocument;
+
+SvgElement svg_parse_element(XmlElement *elem, StringPool pool, uint32_t *tag_indices);
+SvgDocument svg_parse_xml(XmlElement *root, StringPool pool);
+SvgElement svg_parse_def(XmlElement *elem, StringPool pool);
+void svg_document_add_def(SvgDocument *doc, SvgElement def);
 #endif
