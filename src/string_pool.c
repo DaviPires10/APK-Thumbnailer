@@ -40,18 +40,16 @@ static uint32_t hash_string(const char *str) {
   return hash;
 }
 
-static void
-hash_table_insert(StringPoolEntry *table, size_t table_capacity, const char *key, uint32_t index) {
-  if (table_capacity == 0 || !key)
+static void hash_table_insert(StringPool *pool, uint32_t index) {
+  if (!pool || pool->table_capacity == 0 || !pool->strings || !pool->strings[index])
     return;
 
-  uint32_t slot = hash_string(key) % table_capacity;
-  while (table[slot].key != NULL) {
+  uint32_t slot = hash_string(pool->strings[index]) % pool->table_capacity;
+  while (pool->hash_table[slot] != UINT32_MAX) {
     ++slot;
-    slot %= table_capacity;
+    slot %= pool->table_capacity;
   }
-  table[slot].key   = key;
-  table[slot].index = index;
+  pool->hash_table[slot] = index;
 }
 
 static int decode_utf8_length(BinaryReader *reader) {
@@ -72,13 +70,18 @@ static int decode_utf16_length(BinaryReader *reader) {
   return len;
 }
 
-static char *utf16_to_utf8(const uint16_t *in, size_t len) {
-  size_t out_cap = len * 3 + 1;
+static char *utf16_to_utf8(const uint16_t *str, size_t length) {
+  char *result   = NULL;
+  size_t out_cap = length * 3 + 1;
   char *out      = malloc(out_cap);
-  char *p        = out;
 
-  for (size_t i = 0; i < len; i++) {
-    uint32_t c = in[i];
+  if (!out) {
+    return strdup("");
+  }
+
+  char *p = out;
+  for (size_t i = 0; i < length; i++) {
+    uint32_t c = str[i];
 
     if (c < 0x80) {
       *p++ = c;
@@ -91,9 +94,12 @@ static char *utf16_to_utf8(const uint16_t *in, size_t len) {
       *p++ = 0x80 | (c & 0x3F);
     }
   }
-
   *p = 0;
-  return out;
+
+  result = strdup(out);
+  free(out);
+
+  return result;
 }
 
 StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
@@ -151,11 +157,14 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   // Build the initial hash map lookup cache from parsed data
   if (result.count > 0) {
     result.table_capacity = result.capacity * 2;
-    result.hash_table     = calloc(result.table_capacity, sizeof(StringPoolEntry));
+    result.hash_table     = malloc(result.table_capacity * sizeof(uint32_t));
     if (result.hash_table) {
+      for (size_t i = 0; i < result.table_capacity; ++i) {
+        result.hash_table[i] = UINT32_MAX;
+      }
       for (size_t i = 0; i < result.count; ++i) {
         if (result.strings[i]) {
-          hash_table_insert(result.hash_table, result.table_capacity, result.strings[i], i);
+          hash_table_insert(&result, i);
         }
       }
     }
@@ -178,27 +187,31 @@ void string_pool_append(StringPool *pool, char *str) {
     pool->strings  = realloc(pool->strings, pool->capacity * sizeof(char *));
 
     // Scale and rehash the lookup cache to prevent collision degradation
-    size_t new_table_capacity  = pool->capacity * 2;
-    StringPoolEntry *new_table = calloc(new_table_capacity, sizeof(StringPoolEntry));
-    if (new_table) {
+    size_t tmp_cap = pool->capacity * 2;
+    uint32_t *tmp  = malloc(tmp_cap * sizeof(uint32_t));
+    if (tmp) {
+      free(pool->hash_table);
+      pool->hash_table     = tmp;
+      pool->table_capacity = tmp_cap;
+
+      for (size_t i = 0; i < pool->table_capacity; ++i) {
+        tmp[i] = UINT32_MAX;
+      }
+
       for (size_t i = 0; i < pool->count; ++i) {
         if (pool->strings[i]) {
-          hash_table_insert(new_table, new_table_capacity, pool->strings[i], i);
+          hash_table_insert(pool, i);
         }
       }
-      free(pool->hash_table);
-      pool->hash_table     = new_table;
-      pool->table_capacity = new_table_capacity;
     }
   }
 
   if (pool->strings) {
-    char *dup_str              = strdup(str);
-    pool->strings[pool->count] = dup_str;
+    char *dup_str = strdup(str);
 
-    // Add new string record to the map cache
     if (pool->hash_table && dup_str) {
-      hash_table_insert(pool->hash_table, pool->table_capacity, dup_str, pool->count);
+      pool->strings[pool->count] = dup_str;
+      hash_table_insert(pool, pool->count);
     }
     pool->count++;
   }
@@ -218,9 +231,10 @@ uint32_t string_pool_get_index(StringPool pool, const char *str) {
 
   uint32_t slot = hash_string(str) % pool.table_capacity;
 
-  while (pool.hash_table[slot].key != NULL) {
-    if (strcmp(pool.hash_table[slot].key, str) == 0) {
-      return pool.hash_table[slot].index;
+  while (pool.hash_table[slot] != UINT32_MAX) {
+    uint32_t index = pool.hash_table[slot];
+    if (strcmp(pool.strings[index], str) == 0) {
+      return index;
     }
     ++slot;
     slot %= pool.table_capacity;

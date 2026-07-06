@@ -22,16 +22,11 @@
 #include "binary_reader.h"
 
 typedef struct {
-  const char *key;
-  uint32_t index;
-} StringPoolEntry;
-
-typedef struct {
   char **strings;
   size_t count;
   size_t capacity;
 
-  StringPoolEntry *hash_table;
+  uint32_t *hash_table;
   size_t table_capacity;
 } StringPool;
 
