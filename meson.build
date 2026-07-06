@@ -10,7 +10,7 @@ project(
 )
 
 zip_dep = dependency('libzip', version: '>=1.0')
-magick_dep = dependency('MagickWand', version: '>=7.0')
+magick_dep = dependency('GraphicsMagickWand', version: '>=1.0')
 
 deps = [zip_dep, magick_dep]
 

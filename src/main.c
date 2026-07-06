@@ -20,10 +20,10 @@
 #include "string_pool.h"
 #include "xml.h"
 
-#include <MagickWand/MagickWand.h>
 #include <getopt.h>
 #include <stdio.h>
 #include <string.h>
+#include <wand/magick_wand.h>
 
 static const struct option long_opts[] = {
     {"help",    no_argument,       0, 'h'},
@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
   free(resources_data);
   resources_data = NULL;
 
-  MagickWandGenesis();
+  InitializeMagick(NULL);
   magick_initialised = true;
 
   for (size_t i = 0; i < icons.count; ++i) {
@@ -221,7 +221,7 @@ int main(int argc, char **argv) {
 
   MagickSetFormat(image, "PNG");
   if (size > 0) {
-    MagickResizeImage(image, size, size, LanczosFilter);
+    MagickResizeImage(image, size, size, LanczosFilter, 1.0f);
     PixelWand *p_wand = NewPixelWand();
     PixelSetColor(p_wand, "none");
 
@@ -245,7 +245,7 @@ cleanup:
   if (image)
     DestroyMagickWand(image);
   if (magick_initialised)
-    MagickWandTerminus();
+    DestroyMagick();
 
   if (icons.strings)
     string_pool_free(&icons);

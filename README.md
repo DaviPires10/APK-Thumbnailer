@@ -11,7 +11,7 @@ It extracts the launcher icon from an APK and generates a thumbnail image, makin
 The following libraries and tools are required:
 
 - [libzip](https://libzip.org)
-- [ImageMagick (MagickWand)](https://imagemagick.org)
+- [GraphicsMagick](http://www.graphicsmagick.org)
 - Meson
 - Ninja
 - A C compiler with C11 support (GCC or Clang)
