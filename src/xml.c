@@ -215,7 +215,7 @@ XmlElement *xml_find_child(XmlElement *elem, StringPool pool, const char *name) 
 }
 
 bool xml_element_has_name(XmlElement *elem, StringPool pool, const char *name) {
-  if (elem->name.index == UINT32_MAX) {
+  if (!elem || elem->name.index == UINT32_MAX) {
     return false;
   }
 

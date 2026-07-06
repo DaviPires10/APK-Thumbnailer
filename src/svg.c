@@ -150,9 +150,10 @@ map_get(uint32_t index, StringPool pool, size_t map_count, const SvgMap map[map_
   return NULL;
 }
 
-SvgTag svg_get_tag(XmlElement *elem, StringPool pool, uint32_t *tag_indices) {
-  if (!elem)
+static SvgTag svg_get_tag(XmlElement *elem, StringPool pool, uint32_t *tag_indices) {
+  if (!elem || !tag_indices) {
     return TAG_UNKNOWN;
+  }
 
   if (xml_element_has_name(elem, pool, "gradient")) {
     XmlAttribute type_attr = xml_find_attribute(elem, pool, "type");
@@ -175,8 +176,13 @@ SvgTag svg_get_tag(XmlElement *elem, StringPool pool, uint32_t *tag_indices) {
   return TAG_UNKNOWN;
 }
 
-SvgAttribute svg_parse_group(XmlElement *elem, StringPool pool) {
-  SvgAttribute result;
+static SvgAttribute svg_parse_group(XmlElement *elem, StringPool pool) {
+  SvgAttribute result = {0};
+
+  if (!elem) {
+    return result;
+  }
+
   result.name = "transform";
 
   char buffer[256] = {0};
@@ -250,6 +256,10 @@ SvgAttribute svg_parse_group(XmlElement *elem, StringPool pool) {
 SvgAttribute svg_parse_attribute(XmlAttribute attr, StringPool pool, SvgTag elem_tag) {
   SvgAttribute result = {0};
 
+  if (attr.data == UINT32_MAX) {
+    return result;
+  }
+
   switch (elem_tag) {
     case TAG_PATH:
     case TAG_CLIP_PATH:
@@ -281,7 +291,12 @@ SvgAttribute svg_parse_attribute(XmlAttribute attr, StringPool pool, SvgTag elem
 
 SvgElement svg_parse_element(XmlElement *elem, StringPool pool, uint32_t *tag_indices) {
   SvgElement result = {0};
-  result.tag        = svg_get_tag(elem, pool, tag_indices);
+  result.tag        = TAG_UNKNOWN;
+  if (!elem || !tag_indices) {
+    return result;
+  }
+
+  result.tag = svg_get_tag(elem, pool, tag_indices);
 
   if (result.tag == TAG_GROUP) {
     if (elem->attr_count > 0) {
@@ -340,6 +355,9 @@ void svg_document_add_def(SvgDocument *doc, SvgElement def) {
 
 SvgDocument svg_parse_xml(XmlElement *root, StringPool pool) {
   SvgDocument doc = {0};
+  if (!root) {
+    return doc;
+  }
 
   uint32_t tag_indices[countof(tags)];
   string_pool_get_indices_batch(pool, tags, countof(tags), tag_indices);
