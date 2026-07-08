@@ -37,7 +37,7 @@ typedef struct {
   uint8_t type;
   union {
     char *string;
-    int integer;
+    int32_t integer;
     float floating;
   } data;
 } SvgValue;
@@ -49,7 +49,7 @@ typedef struct {
 
 typedef struct SvgElement {
   SvgTag tag;
-  const char *id;
+  uint32_t id;
 
   size_t attr_count;
   SvgAttribute *attributes;
@@ -75,8 +75,10 @@ typedef struct {
   SvgElement *vector;
 } SvgDocument;
 
-SvgElement svg_parse_element(XmlElement *elem, StringPool pool, uint32_t *tag_indices);
+SvgElement
+svg_parse_element(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t *tag_indices);
 SvgDocument svg_parse_xml(XmlElement *root, StringPool pool);
-SvgElement svg_parse_def(XmlElement *elem, StringPool pool);
+SvgElement svg_parse_def(XmlElement *elem, StringPool pool, uint32_t id);
 void svg_document_add_def(SvgDocument *doc, SvgElement def);
+
 #endif

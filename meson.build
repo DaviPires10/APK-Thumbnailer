@@ -15,15 +15,15 @@ magick_dep = dependency('GraphicsMagickWand', version: '>=1.0')
 deps = [zip_dep, magick_dep]
 
 src = files(
-    'src/main.c',
     'src/apk.c',
     'src/binary_reader.c',
     'src/chunk.c',
+    'src/main.c',
     'src/string_pool.c',
     'src/svg.c',
+    'src/svg_writer.c',
     'src/xml.c',
 )
-
 
 executable(
     'apk-thumbnailer',
