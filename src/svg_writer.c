@@ -24,7 +24,7 @@ void svg_write_attribute(FILE *fp, SvgAttribute attr) {
 
   switch (attr.value.type) {
     case TYPE_REFERENCE:
-      fprintf(fp, "%s=\"url(res%#08X)\"", name, value.data.integer);
+      fprintf(fp, "%s=\"url(#res%#08X)\"", name, value.data.integer);
       break;
 
     case TYPE_STRING:
@@ -105,13 +105,16 @@ void svg_write_element(FILE *fp, SvgElement *elem) {
 
   fprintf(fp, "<%s", name);
   if (elem->id != UINT32_MAX) {
-    fprintf(fp, " id=\"res%#08X\"\n", elem->id);
+    fprintf(fp, " id=\"res%#08X\"", elem->id);
   }
+
   for (size_t i = 0; i < elem->attr_count; ++i) {
-    if (elem->attributes[i].value.type != TYPE_NULL) {
-      fputc(' ', fp);
-      svg_write_attribute(fp, elem->attributes[i]);
+    SvgAttribute attr = elem->attributes[i];
+    if (attr.value.type == TYPE_NULL || attr.name == NULL) {
+      continue;
     }
+    fputc(' ', fp);
+    svg_write_attribute(fp, attr);
   }
 
   if (elem->children_count > 0) {
@@ -133,10 +136,14 @@ void svg_write_document(FILE *fp, SvgDocument *doc) {
   fprintf(fp, "<svg width=\"%g\" height=\"%g\" viewBox=\"0 0 %g %g\" xmlns=\"%s\">\n", //
           doc->width, doc->height, doc->view_width, doc->view_height, doc->ns);
 
-  for (size_t i = 0; i < doc->defs_count; ++i) {
-    svg_write_element(fp, &doc->defs[i]);
-  }
+  if (doc->defs_count > 0) {
+    fprintf(fp, "<defs>\n");
 
+    for (size_t i = 0; i < doc->defs_count; ++i) {
+      svg_write_element(fp, &doc->defs[i]);
+    }
+    fprintf(fp, "</defs>\n");
+  }
   for (size_t i = 0; i < doc->vector_count; ++i) {
     svg_write_element(fp, &doc->vector[i]);
   }
