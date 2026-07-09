@@ -186,14 +186,27 @@ static SvgTag svg_get_tag(XmlElement *elem, StringPool pool, uint32_t *tag_indic
   return TAG_UNKNOWN;
 }
 
-static SvgAttribute svg_parse_group(XmlElement *elem, StringPool pool) {
-  SvgAttribute result = {0};
+static SvgElement
+svg_parse_group(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t *tag_indices) {
+  SvgElement result = {0};
+  result.tag        = TAG_GROUP;
+  result.id         = UINT32_MAX;
 
   if (!elem) {
     return result;
   }
 
-  result.name = "transform";
+  if (elem->attr_count == 0) {
+    goto children_append;
+  }
+  result.attr_count = 1;
+  result.attributes = malloc(sizeof(SvgAttribute));
+  if (!result.attributes) {
+    return result;
+  }
+
+  SvgAttribute transform = {0};
+  transform.name         = "transform";
 
   char buffer[256] = {0};
   size_t len       = 0;
@@ -257,8 +270,24 @@ static SvgAttribute svg_parse_group(XmlElement *elem, StringPool pool) {
         snprintf(&buffer[len], sizeof(buffer) - len, "scale(%g, %g)", props.scale_x, props.scale_y);
   }
 
-  result.value.data.string = len > 0 ? strdup(buffer) : strdup("");
-  result.value.type        = TYPE_STRING;
+  transform.value.data.string = len > 0 ? strdup(buffer) : strdup("");
+  transform.value.type        = TYPE_STRING;
+  result.attributes[0]        = transform;
+
+children_append:
+  if (elem->children_count > 0) {
+    result.children = malloc(elem->children_count * sizeof(SvgElement *));
+    if (result.children) {
+      for (size_t i = 0; i < elem->children_count; ++i) {
+        SvgElement *child = malloc(sizeof(SvgElement));
+        if (child) {
+          *child             = svg_parse_element(doc, elem->children[i], pool, tag_indices);
+          result.children[i] = child;
+          result.children_count++;
+        }
+      }
+    }
+  }
 
   return result;
 }
@@ -476,15 +505,8 @@ svg_parse_element(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t 
   result.tag = svg_get_tag(elem, pool, tag_indices);
   switch (result.tag) {
     case TAG_GROUP:
-      if (elem->attr_count > 0) {
-        result.attributes = malloc(sizeof(SvgAttribute));
-        if (!result.attributes) {
-          break;
-        }
-        result.attributes[0] = svg_parse_group(elem, pool);
-        result.attr_count    = 1;
-      }
-      break;
+      result = svg_parse_group(doc, elem, pool, tag_indices);
+      return result;
 
     case TAG_LINEAR_GRADIENT:
     case TAG_RADIAL_GRADIENT:
@@ -502,20 +524,6 @@ svg_parse_element(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t 
         }
       }
       break;
-  }
-
-  if (elem->children_count > 0) {
-    result.children = malloc(elem->children_count * sizeof(SvgElement *));
-    if (result.children) {
-      for (size_t i = 0; i < elem->children_count; ++i) {
-        SvgElement *child = malloc(sizeof(SvgElement));
-        if (child) {
-          *child             = svg_parse_element(doc, elem->children[i], pool, tag_indices);
-          result.children[i] = child;
-          result.children_count++;
-        }
-      }
-    }
   }
 
   return result;
