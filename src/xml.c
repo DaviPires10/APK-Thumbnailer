@@ -237,29 +237,22 @@ void xml_free_element(XmlElement *elem) {
   free(elem);
 }
 
-XmlAttribute xml_find_attribute(XmlElement *elem, StringPool pool, const char *name) {
-  XmlAttribute result = {
-      .name.index = UINT32_MAX,
-      .data_type  = TYPE_NULL,
-      .data       = UINT32_MAX,
-  };
-
+XmlAttribute *xml_find_attribute(XmlElement *elem, StringPool pool, const char *name) {
   if (!elem || !name) {
-    return result;
+    return NULL;
   }
 
   uint32_t name_index = string_pool_get_index(pool, name);
   if (name_index == UINT32_MAX) {
-    return result;
+    return NULL;
   }
 
   for (size_t i = 0; i < elem->attr_count; ++i) {
-    XmlAttribute attr = elem->attributes[i];
-    if (attr.name.index == name_index) {
-      result = elem->attributes[i];
-      break;
+    XmlAttribute *attr = &elem->attributes[i];
+    if (attr->name.index == name_index) {
+      return attr;
     }
   }
 
-  return result;
+  return NULL;
 }

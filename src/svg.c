@@ -84,12 +84,15 @@ map_get(uint32_t index, StringPool pool, size_t map_count, const SvgMap map[map_
   return NULL;
 }
 
-static SvgValue svg_parse_value(SvgDocument *doc, XmlAttribute attr, StringPool pool) {
-
+static SvgValue svg_parse_value(SvgDocument *doc, XmlAttribute *attr, StringPool pool) {
   SvgValue value = {0};
 
-  value.type    = attr.data_type;
-  uint32_t data = attr.data;
+  if (!attr) {
+    return value;
+  }
+
+  value.type    = attr->data_type;
+  uint32_t data = attr->data;
 
   switch (value.type) {
     case TYPE_REFERENCE:
@@ -239,8 +242,8 @@ svg_parse_group(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t *t
 
   float *props_array = (float *)&props;
   for (size_t i = 0; i < countof(target_attrs); ++i) {
-    XmlAttribute attr = xml_find_attribute(elem, pool, target_attrs[i]);
-    if (attr.data != UINT32_MAX) {
+    XmlAttribute *attr = xml_find_attribute(elem, pool, target_attrs[i]);
+    if (attr) {
       props_array[i] = svg_parse_value(NULL, attr, pool).data.floating;
     }
   }
@@ -301,10 +304,10 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
     return result;
   }
 
-  XmlAttribute fill      = xml_find_attribute(elem, pool, "fillColor");
-  XmlAttribute fill_rule = xml_find_attribute(elem, pool, "fillType");
-  XmlAttribute linecap   = xml_find_attribute(elem, pool, "strokeLineCap");
-  XmlAttribute linejoin  = xml_find_attribute(elem, pool, "strokeLineJoin");
+  XmlAttribute *fill      = xml_find_attribute(elem, pool, "fillColor");
+  XmlAttribute *fill_rule = xml_find_attribute(elem, pool, "fillType");
+  XmlAttribute *linecap   = xml_find_attribute(elem, pool, "strokeLineCap");
+  XmlAttribute *linejoin  = xml_find_attribute(elem, pool, "strokeLineJoin");
 
   const char *fill_rule_str[] = {
       "evenodd",
@@ -323,7 +326,7 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
       "bevel",
   };
 
-  if (fill.name.index == UINT32_MAX) {
+  if (!fill) {
     result.attributes = malloc((elem->attr_count + 1) * sizeof(SvgAttribute));
   } else {
     result.attributes = malloc(elem->attr_count * sizeof(SvgAttribute));
@@ -333,22 +336,22 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
     return result;
   }
   for (size_t i = 0; i < elem->attr_count; ++i) {
-    uint32_t name_index = elem->attributes[i].name.index;
-    if (name_index == fill_rule.name.index || //
-        name_index == linecap.name.index ||   //
-        name_index == linejoin.name.index) {
+    XmlAttribute *xml_attr = &elem->attributes[i];
+    if (xml_attr == fill_rule || //
+        xml_attr == linecap ||   //
+        xml_attr == linejoin) {
       continue;
     }
 
     SvgAttribute attr = {0};
 
-    attr.name  = map_get(name_index, pool, countof(path_attrs), path_attrs);
-    attr.value = svg_parse_value(doc, elem->attributes[i], pool);
+    attr.name  = map_get(xml_attr->name.index, pool, countof(path_attrs), path_attrs);
+    attr.value = svg_parse_value(doc, &elem->attributes[i], pool);
 
     result.attributes[result.attr_count++] = attr;
   }
 
-  if (fill.name.index == UINT32_MAX) {
+  if (!fill) {
     SvgAttribute fill_attr = {0};
 
     fill_attr.name              = "fill";
@@ -358,37 +361,37 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
     result.attributes[result.attr_count++] = fill_attr;
   }
 
-  if (fill_rule.name.index != UINT32_MAX) {
+  if (fill_rule) {
     SvgAttribute fill_rule_attr = {0};
 
-    fill_rule_attr.name = map_get(fill_rule.name.index, pool, countof(path_attrs), path_attrs);
-    if (fill_rule.data < countof(fill_rule_str)) {
+    fill_rule_attr.name = map_get(fill_rule->name.index, pool, countof(path_attrs), path_attrs);
+    if (fill_rule->data < countof(fill_rule_str)) {
       fill_rule_attr.value.type        = TYPE_STRING;
-      fill_rule_attr.value.data.string = strdup(fill_rule_str[fill_rule.data]);
+      fill_rule_attr.value.data.string = strdup(fill_rule_str[fill_rule->data]);
     }
 
     result.attributes[result.attr_count++] = fill_rule_attr;
   }
 
-  if (linecap.name.index != UINT32_MAX) {
+  if (linecap) {
     SvgAttribute linecap_attr = {0};
 
-    linecap_attr.name = map_get(linecap.name.index, pool, countof(path_attrs), path_attrs);
-    if (linecap.data < countof(linecap_str)) {
+    linecap_attr.name = map_get(linecap->name.index, pool, countof(path_attrs), path_attrs);
+    if (linecap->data < countof(linecap_str)) {
       linecap_attr.value.type        = TYPE_STRING;
-      linecap_attr.value.data.string = strdup(linecap_str[linecap.data]);
+      linecap_attr.value.data.string = strdup(linecap_str[linecap->data]);
     }
 
     result.attributes[result.attr_count++] = linecap_attr;
   }
 
-  if (linejoin.name.index != UINT32_MAX) {
+  if (linejoin) {
     SvgAttribute linejoin_attr = {0};
 
-    linejoin_attr.name = map_get(linejoin.name.index, pool, countof(path_attrs), path_attrs);
-    if (linejoin.data < countof(linejoin_str)) {
+    linejoin_attr.name = map_get(linejoin->name.index, pool, countof(path_attrs), path_attrs);
+    if (linejoin->data < countof(linejoin_str)) {
       linejoin_attr.value.type        = TYPE_STRING;
-      linejoin_attr.value.data.string = strdup(linejoin_str[linejoin.data]);
+      linejoin_attr.value.data.string = strdup(linejoin_str[linejoin->data]);
     }
 
     result.attributes[result.attr_count++] = linejoin_attr;
@@ -406,14 +409,14 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     return result;
   }
 
-  XmlAttribute type = xml_find_attribute(elem, pool, "type");
-  if (type.name.index == UINT32_MAX) {
+  XmlAttribute *type = xml_find_attribute(elem, pool, "type");
+  if (!type) {
     return result;
   }
 
-  if (type.data == 0) {
+  if (type->data == 0) {
     result.tag = TAG_LINEAR_GRADIENT;
-  } else if (type.data == 1) {
+  } else if (type->data == 1) {
     result.tag = TAG_RADIAL_GRADIENT;
   } else {
     return result;
@@ -442,7 +445,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     if (!attr.name) {
       continue;
     }
-    attr.value = svg_parse_value(NULL, elem->attributes[i], pool);
+    attr.value = svg_parse_value(NULL, &elem->attributes[i], pool);
 
     result.attributes[result.attr_count++] = attr;
   }
@@ -482,7 +485,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
           for (size_t j = 0; j < stop->attr_count; ++j) {
             uint32_t name_index       = attrs[j].name.index;
             stop->attributes[j].name  = map_get(name_index, pool, countof(item_attrs), item_attrs);
-            stop->attributes[j].value = svg_parse_value(NULL, attrs[j], pool);
+            stop->attributes[j].value = svg_parse_value(NULL, &attrs[j], pool);
           }
           stop->children_count = 0;
           stop->children       = NULL;
@@ -491,21 +494,21 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
       }
     }
   } else {
-    XmlAttribute start_color  = xml_find_attribute(elem, pool, "startColor");
-    XmlAttribute center_color = xml_find_attribute(elem, pool, "centerColor");
-    XmlAttribute end_color    = xml_find_attribute(elem, pool, "endColor");
+    XmlAttribute *start_color  = xml_find_attribute(elem, pool, "startColor");
+    XmlAttribute *center_color = xml_find_attribute(elem, pool, "centerColor");
+    XmlAttribute *end_color    = xml_find_attribute(elem, pool, "endColor");
 
     XmlAttribute *color_items[3] = {0};
 
     size_t stop_count = 0;
-    if (start_color.name.index != UINT32_MAX) {
-      color_items[stop_count++] = &start_color;
+    if (start_color) {
+      color_items[stop_count++] = start_color;
     }
-    if (center_color.name.index != UINT32_MAX) {
-      color_items[stop_count++] = &center_color;
+    if (center_color) {
+      color_items[stop_count++] = center_color;
     }
-    if (end_color.name.index != UINT32_MAX) {
-      color_items[stop_count++] = &end_color;
+    if (end_color) {
+      color_items[stop_count++] = end_color;
     }
 
     if (stop_count == 0) {
@@ -527,7 +530,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
 
     for (size_t i = 0; i < stop_count; ++i) {
       XmlAttribute *color_attr = color_items[i];
-      if (color_attr->name.index == UINT32_MAX) {
+      if (!color_attr) {
         goto cleanup;
       }
 
@@ -553,7 +556,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
       offset += inc;
 
       stop->attributes[1].name  = "stop-color";
-      stop->attributes[1].value = svg_parse_value(NULL, *color_attr, pool);
+      stop->attributes[1].value = svg_parse_value(NULL, color_attr, pool);
 
       result.children[i] = stop;
     }
@@ -587,7 +590,7 @@ svg_parse_attribute(SvgDocument *doc, XmlAttribute attr, StringPool pool, SvgTag
   switch (elem_tag) {
     case TAG_CLIP_PATH:
       result.name  = map_get(attr.name.index, pool, countof(path_attrs), path_attrs);
-      result.value = svg_parse_value(doc, attr, pool);
+      result.value = svg_parse_value(doc, &attr, pool);
       break;
 
     default:
@@ -654,10 +657,8 @@ void svg_document_add_def(SvgDocument *doc, SvgElement def) {
     return;
 
   for (size_t i = 0; i < doc->defs_count; ++i) {
-    if (doc->defs[i].id == def.id) {
-      if (doc->defs[i].tag == TAG_UNKNOWN && def.tag != TAG_UNKNOWN) {
-        doc->defs[i] = def;
-      }
+    if (doc->defs[i].id == def.id && doc->defs[i].tag == TAG_UNKNOWN && def.tag != TAG_UNKNOWN) {
+      doc->defs[i] = def;
       return;
     }
   }
@@ -681,10 +682,10 @@ SvgDocument svg_parse_xml(XmlElement *root, StringPool pool) {
   uint32_t tag_indices[countof(tags)];
   string_pool_get_indices_batch(pool, tags, countof(tags), tag_indices);
 
-  XmlAttribute width       = xml_find_attribute(root, pool, "width");
-  XmlAttribute height      = xml_find_attribute(root, pool, "height");
-  XmlAttribute view_width  = xml_find_attribute(root, pool, "viewportWidth");
-  XmlAttribute view_height = xml_find_attribute(root, pool, "viewportHeight");
+  XmlAttribute *width       = xml_find_attribute(root, pool, "width");
+  XmlAttribute *height      = xml_find_attribute(root, pool, "height");
+  XmlAttribute *view_width  = xml_find_attribute(root, pool, "viewportWidth");
+  XmlAttribute *view_height = xml_find_attribute(root, pool, "viewportHeight");
 
   doc.ns          = "http://www.w3.org/2000/svg";
   doc.width       = svg_parse_value(NULL, width, pool).data.floating;

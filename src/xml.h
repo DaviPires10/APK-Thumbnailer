@@ -70,6 +70,6 @@ XmlElement *xml_find_child(XmlElement *elem, StringPool pool, const char *name);
 bool xml_element_has_name(XmlElement *elem, StringPool pool, const char *name);
 XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out_pool);
 
-XmlAttribute xml_find_attribute(XmlElement *elem, StringPool pool, const char *name);
+XmlAttribute *xml_find_attribute(XmlElement *elem, StringPool pool, const char *name);
 
 #endif
