@@ -18,6 +18,8 @@
 
 #include "apk.h"
 #include "string_pool.h"
+#include "svg.h"
+#include "svg_writer.h"
 #include "xml.h"
 
 #include <getopt.h>
@@ -125,7 +127,7 @@ int main(int argc, char **argv) {
   bool magick_initialised  = false;
 
   za = zip_open(in_path, ZIP_RDONLY, &err);
-  if (za == NULL) {
+  if (!za) {
     zip_error_t error;
     zip_error_init_with_code(&error, err);
     fprintf(stderr, "Failed to open %s: %s\n", in_path, zip_error_strerror(&error));
@@ -142,23 +144,23 @@ int main(int argc, char **argv) {
 
   // get icon_id from AndroidManifest.xml
   uint32_t icon_id = UINT32_MAX;
+  {
+    StringPool manifest_pool = {0};
+    manifest                 = xml_parse_document(manifest_data, manifest_size, &manifest_pool);
+    XmlElement *application  = xml_find_child(manifest, manifest_pool, "application");
+    XmlAttribute *icon       = xml_find_attribute(application, manifest_pool, "icon");
+    if (!icon) {
+      fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
+      goto cleanup;
+    }
+    icon_id = icon->data;
 
-  StringPool manifest_pool = {0};
-
-  manifest                = xml_parse_document(manifest_data, manifest_size, &manifest_pool);
-  XmlElement *application = xml_find_child(manifest, manifest_pool, "application");
-  XmlAttribute icon       = xml_find_attribute(application, manifest_pool, "icon");
-  if (icon.data == UINT32_MAX) {
-    fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
-    goto cleanup;
+    string_pool_free(&manifest_pool);
+    xml_free_element(manifest);
+    free(manifest_data);
+    manifest      = NULL;
+    manifest_data = NULL;
   }
-  icon_id = icon.data;
-
-  string_pool_free(&manifest_pool);
-  xml_free_element(manifest);
-  free(manifest_data);
-  manifest      = NULL;
-  manifest_data = NULL;
 
   if (verbose) {
     printf("Found target Icon Reference ID: %#X\n", icon_id);
@@ -178,9 +180,6 @@ int main(int argc, char **argv) {
     goto cleanup;
   }
 
-  free(resources_data);
-  resources_data = NULL;
-
   InitializeMagick(NULL);
   magick_initialised = true;
 
@@ -189,25 +188,72 @@ int main(int argc, char **argv) {
     if (!path) {
       continue;
     }
+
     const char *dot = strrchr(path, '.');
     if (dot && strcmp(dot, ".xml") == 0) {
-      if (verbose)
-        printf("Skipped XML file: %s\n", path);
-      continue;
-    }
+      StringPool ic_laucher_pool = {0};
+      size_t ic_laucher_size     = 0;
+      uint8_t *ic_laucher_data   = apk_extract_file(za, path, &ic_laucher_size);
+      XmlElement *ic_launcher =
+          xml_parse_document(ic_laucher_data, ic_laucher_size, &ic_laucher_pool);
+      XmlElement *fg         = xml_find_child(ic_launcher, ic_laucher_pool, "foreground");
+      XmlAttribute *drawable = xml_find_attribute(fg, ic_laucher_pool, "drawable");
+      if (!drawable) {
+        continue;
+      }
+      char *vector_path = get_resource(resources_data, resources_size, drawable->data).strings[0];
 
-    if (verbose)
-      printf("Found Image Asset: %s\n", path);
+      const char *dot = strrchr(vector_path, '.');
+      if (dot && strcmp(dot, ".xml") != 0) {
+        if (i > 0) {
+          path = icons.strings[i - 1];
+        } else {
+          path = vector_path;
+        }
+        goto image_proccessing;
+      }
 
-    size_t icon_size;
-    uint8_t *icon_data = apk_extract_file(za, path, &icon_size);
-    if (!icon_data) {
-      fprintf(stderr, "Failed to extract icon file from ZIP: %s\n", path);
+      StringPool vector_pool = {0};
+      size_t vector_size     = 0;
+      uint8_t *vector_data   = apk_extract_file(za, vector_path, &vector_size);
+      XmlElement *vector     = xml_parse_document(vector_data, vector_size, &vector_pool);
+      SvgDocument svg        = svg_parse_xml(vector, vector_pool);
+
+      for (size_t i = 0; i < svg.defs_count; ++i) {
+        size_t def_size     = 0;
+        StringPool def_pool = {0};
+        char *def_path    = get_resource(resources_data, resources_size, svg.defs[i].id).strings[0];
+        uint8_t *def_data = apk_extract_file(za, def_path, &def_size);
+        XmlElement *xml_def = xml_parse_document(def_data, def_size, &def_pool);
+        SvgElement def      = svg_parse_def(xml_def, def_pool, svg.defs[i].id);
+        svg_document_add_def(&svg, def);
+      }
+
+      FILE *fp = fopen(out_path, "w");
+      if (!fp) {
+        return EXIT_FAILURE;
+      }
+      if (size > svg.width) {
+        svg.width  = size;
+        svg.height = size;
+      }
+
+      svg_write_document(fp, &svg);
+
+      fclose(fp);
       goto cleanup;
-    }
+    } else
+    image_proccessing: {
+      size_t icon_size;
+      uint8_t *icon_data = apk_extract_file(za, path, &icon_size);
+      if (!icon_data) {
+        fprintf(stderr, "Failed to extract icon file from ZIP: %s\n", path);
+        goto cleanup;
+      }
 
-    extract_image(&image, path, icon_data, icon_size);
-    free(icon_data);
+      extract_image(&image, path, icon_data, icon_size);
+      free(icon_data);
+    }
   }
   string_pool_free(&icons);
 
