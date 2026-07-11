@@ -80,5 +80,7 @@ svg_parse_element(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t 
 SvgDocument svg_parse_xml(XmlElement *root, StringPool pool);
 SvgElement svg_parse_def(XmlElement *elem, StringPool pool, uint32_t id);
 void svg_document_add_def(SvgDocument *doc, SvgElement def);
+void svg_free_element(SvgElement *elem);
+void svg_free_document(SvgDocument *doc);
 
 #endif
