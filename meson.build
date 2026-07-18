@@ -19,6 +19,7 @@ src = files(
     'src/binary_reader.c',
     'src/chunk.c',
     'src/main.c',
+    'src/resource_value.c',
     'src/string_pool.c',
     'src/svg.c',
     'src/svg_writer.c',

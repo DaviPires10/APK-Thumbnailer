@@ -18,7 +18,6 @@
 
 #include "binary_reader.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 BinaryReader set_buffer(const uint8_t *data, size_t size) {
@@ -30,45 +29,64 @@ BinaryReader set_buffer(const uint8_t *data, size_t size) {
 }
 
 void clear_buffer(BinaryReader *reader) {
+  if (!reader) {
+    return;
+  }
+
   reader->data = NULL;
   reader->pos  = 0;
   reader->size = 0;
 }
 
 bool at_end(BinaryReader *reader) {
+  if (!reader) {
+    return true;
+  }
+
   return reader->pos >= reader->size;
 }
 
 void seek(BinaryReader *reader, size_t pos) {
+  if (!reader) {
+    return;
+  }
+
   reader->pos = pos;
   if (reader->pos > reader->size)
     reader->pos = reader->size;
 }
 
 void skip(BinaryReader *reader, size_t bytes) {
-  reader->pos += bytes;
+  if (!reader) {
+    return;
+  }
 
-  if (reader->pos > reader->size)
+  reader->pos += bytes;
+  if (reader->pos > reader->size) {
     reader->pos = reader->size;
+  }
 }
 
 uint8_t read_u8(BinaryReader *reader) {
-  if (reader->pos + 1 > reader->size)
+  if (reader->pos + 1 > reader->size) {
     return 0;
+  }
   return reader->data[reader->pos++];
 }
 
 uint16_t read_u16(BinaryReader *reader) {
-  if (reader->pos + 2 > reader->size)
+  if (reader->pos + 2 > reader->size) {
     return 0;
+  }
   uint16_t val = reader->data[reader->pos] | (reader->data[reader->pos + 1] << 8);
   reader->pos += 2;
   return val;
 }
 
 uint32_t read_u32(BinaryReader *reader) {
-  if (reader->pos + 4 > reader->size)
+  if (reader->pos + 4 > reader->size) {
     return 0;
+  }
   uint32_t val = reader->data[reader->pos] | (reader->data[reader->pos + 1] << 8) |
                  (reader->data[reader->pos + 2] << 16) | (reader->data[reader->pos + 3] << 24);
   reader->pos += 4;
@@ -76,9 +94,18 @@ uint32_t read_u32(BinaryReader *reader) {
 }
 
 size_t read_raw(BinaryReader *reader, void *dst, size_t bytes) {
-  if (reader->pos + bytes > reader->size)
+  if (!reader || !dst) {
+    return 0;
+  }
+
+  if (reader->pos + bytes > reader->size) {
     bytes = reader->size - reader->pos;
-  memcpy(dst, &reader->data[reader->pos], bytes);
-  reader->pos += bytes;
+  }
+
+  if (bytes > 0) {
+    memcpy(dst, reader->data + reader->pos, bytes);
+    reader->pos += bytes;
+  }
+
   return bytes;
 }

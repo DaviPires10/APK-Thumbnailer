@@ -107,8 +107,8 @@ static SvgValue svg_parse_value(SvgDocument *doc, XmlAttribute *attr, StringPool
     return value;
   }
 
-  value.type    = attr->data_type;
-  uint32_t data = attr->data;
+  value.type    = attr->value.type;
+  uint32_t data = attr->value.data;
 
   switch (value.type) {
     case TYPE_REFERENCE:
@@ -226,9 +226,9 @@ static SvgAttribute make_enum_attr(XmlAttribute *xml_attr,
     return attr;
   }
 
-  if (xml_attr->data < str_count) {
+  if (xml_attr->value.data < str_count) {
     attr.value.type        = TYPE_STRING;
-    attr.value.data.string = strdup(str_values[xml_attr->data]);
+    attr.value.data.string = strdup(str_values[xml_attr->value.data]);
   }
 
   return attr;
@@ -474,9 +474,9 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     return result;
   }
 
-  if (type->data == 0) {
+  if (type->value.data == 0) {
     result.tag = TAG_LINEAR_GRADIENT;
-  } else if (type->data == 1) {
+  } else if (type->value.data == 1) {
     result.tag = TAG_RADIAL_GRADIENT;
   } else {
     return result;

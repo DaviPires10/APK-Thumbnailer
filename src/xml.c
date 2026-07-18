@@ -28,14 +28,6 @@ struct ResTable_ref {
   uint32_t ident;
 };
 
-struct Res_value {
-  uint16_t size;
-  uint8_t res0;
-
-  uint8_t data_type;
-  uint32_t data;
-};
-
 struct ResXMLTree_attrExt {
   struct ResStringPool_ref ns;
   struct ResStringPool_ref name;
@@ -50,7 +42,6 @@ struct ResXMLTree_attribute {
   struct ResStringPool_ref name;
 
   struct ResStringPool_ref raw_value;
-  struct Res_value typed_value;
 };
 
 static void xml_add_child(XmlElement *parent, XmlElement *child) {
@@ -94,17 +85,12 @@ XmlElement *xml_parse_element(BinaryReader *reader) {
   }
   for (size_t i = 0; i < node.attr_count; ++i) {
     struct ResXMLTree_attribute attr;
-    attr.ns.index              = read_u32(reader);
-    attr.name.index            = read_u32(reader);
-    attr.raw_value.index       = read_u32(reader);
-    attr.typed_value.size      = read_u16(reader);
-    attr.typed_value.res0      = read_u8(reader);
-    attr.typed_value.data_type = read_u8(reader);
-    attr.typed_value.data      = read_u32(reader);
+    attr.ns.index        = read_u32(reader);
+    attr.name.index      = read_u32(reader);
+    attr.raw_value.index = read_u32(reader);
 
     result->attributes[i].name.index = attr.name.index;
-    result->attributes[i].data_type  = attr.typed_value.data_type;
-    result->attributes[i].data       = attr.typed_value.data;
+    result->attributes[i].value      = parse_resource_value(reader);
   }
 
   result->name.index = node.name.index;
@@ -179,7 +165,8 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
 
       next_chunk:
       default:
-        skip_chunk(&reader, chunk_start, header);
+        seek(&reader, chunk_start);
+        skip(&reader, header.size);
         break;
     }
   }

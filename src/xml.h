@@ -20,35 +20,15 @@
 #define XML_H
 
 #include "binary_reader.h"
+#include "resource_value.h"
 #include "string_pool.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
-enum : uint8_t {
-  TYPE_NULL              = 0x00,
-  TYPE_REFERENCE         = 0x01,
-  TYPE_ATTRIBUTE         = 0x02,
-  TYPE_STRING            = 0x03,
-  TYPE_FLOAT             = 0x04,
-  TYPE_DIMENSION         = 0x05,
-  TYPE_FRACTION          = 0x06,
-  TYPE_DYNAMIC_REFERENCE = 0x07,
-  TYPE_DYNAMIC_ATTRIBUTE = 0x08,
-  TYPE_INT_DEC           = 0x10,
-  TYPE_INT_HEX           = 0x11,
-  TYPE_INT_BOOLEAN       = 0x12,
-  TYPE_INT_COLOR_ARGB8   = 0x1c,
-  TYPE_INT_COLOR_RGB8    = 0x1d,
-  TYPE_INT_COLOR_ARGB4   = 0x1e,
-  TYPE_INT_COLOR_RGB4    = 0x1f,
-};
-
 typedef struct {
   struct ResStringPool_ref name;
-
-  uint8_t data_type;
-  uint32_t data;
+  ResourceValue value;
 } XmlAttribute;
 
 typedef struct XmlElement {
