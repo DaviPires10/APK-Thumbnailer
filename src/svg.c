@@ -100,15 +100,11 @@ map_get(XmlAttribute *attr, StringPool pool, size_t map_count, const SvgMap map[
   return NULL;
 }
 
-static SvgValue svg_parse_value(SvgDocument *doc, XmlAttribute *attr, StringPool pool) {
+static SvgValue svg_parse_value(SvgDocument *doc, StringPool pool, ResourceValue resource) {
   SvgValue value = {0};
 
-  if (!attr) {
-    return value;
-  }
-
-  value.type    = attr->value.type;
-  uint32_t data = attr->value.data;
+  value.type    = resource.type;
+  uint32_t data = resource.data;
 
   switch (value.type) {
     case TYPE_REFERENCE:
@@ -195,7 +191,8 @@ static float get_float_attr(XmlElement *elem, StringPool pool, const char *name)
 
   XmlAttribute *attr = xml_find_attribute(elem, pool, name);
   if (attr) {
-    result = svg_parse_value(NULL, attr, pool).data.floating;
+    SvgValue value = svg_parse_value(NULL, pool, attr->value);
+    result         = value.data.floating;
   }
 
   return result;
@@ -261,7 +258,7 @@ static SvgElement *create_stop_element(float offset, SvgValue color) {
   return stop;
 }
 
-static SvgTag svg_get_tag(XmlElement *elem, StringPool pool, uint32_t *tag_indices) {
+static SvgTag svg_get_tag(XmlElement *elem, uint32_t *tag_indices) {
   if (!elem || !tag_indices) {
     return TAG_UNKNOWN;
   }
@@ -409,7 +406,7 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
     SvgAttribute attr = {0};
 
     attr.name  = map_get(xml_attr, pool, countof(path_attrs), path_attrs);
-    attr.value = svg_parse_value(doc, xml_attr, pool);
+    attr.value = svg_parse_value(doc, pool, xml_attr->value);
 
     result.attributes[result.attr_count++] = attr;
   }
@@ -455,7 +452,7 @@ static SvgElement svg_parse_clip_path(SvgDocument *doc, XmlElement *elem, String
 
   result.attr_count          = 1;
   result.attributes[0].name  = "d";
-  result.attributes[0].value = svg_parse_value(doc, path_data, pool);
+  result.attributes[0].value = svg_parse_value(doc, pool, path_data->value);
 
   return result;
 }
@@ -505,7 +502,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     if (!attr.name) {
       continue;
     }
-    attr.value = svg_parse_value(NULL, xml_attr, pool);
+    attr.value = svg_parse_value(NULL, pool, xml_attr->value);
 
     result.attributes[result.attr_count++] = attr;
   }
@@ -528,7 +525,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
       }
 
       float offset   = get_float_attr(item, pool, "offset");
-      SvgValue color = svg_parse_value(NULL, color_attr, pool);
+      SvgValue color = svg_parse_value(NULL, pool, color_attr->value);
 
       SvgElement *stop = create_stop_element(offset, color);
       if (stop) {
@@ -568,7 +565,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     float inc    = (stop_count > 1) ? 1.0f / (stop_count - 1) : 0.0f;
 
     for (size_t i = 0; i < stop_count; ++i) {
-      SvgValue color   = svg_parse_value(NULL, color_items[i], pool);
+      SvgValue color   = svg_parse_value(NULL, pool, color_items[i]->value);
       SvgElement *stop = create_stop_element(offset, color);
       if (!stop) {
         svg_free_element(&result);
@@ -595,7 +592,7 @@ svg_parse_element(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t 
     return result;
   }
 
-  result.tag = svg_get_tag(elem, pool, tag_indices);
+  result.tag = svg_get_tag(elem, tag_indices);
   switch (result.tag) {
     case TAG_GROUP:
       result = svg_parse_group(doc, elem, pool, tag_indices);
@@ -672,7 +669,14 @@ SvgDocument svg_parse_xml(XmlElement *root, StringPool pool) {
   doc.view_height = get_float_attr(root, pool, "viewportHeight");
 
   doc.vector_count = root->children_count;
-  doc.vector       = realloc(doc.vector, doc.vector_count * sizeof(SvgElement));
+  if (doc.vector_count > 0) {
+    doc.vector = calloc(doc.vector_count, sizeof(SvgElement));
+    if (!doc.vector) {
+      doc.vector_count = 0;
+      return doc;
+    }
+  }
+
   for (size_t i = 0; i < doc.vector_count; ++i) {
     SvgElement elem = svg_parse_element(&doc, root->children[i], pool, tag_indices);
     doc.vector[i]   = elem;

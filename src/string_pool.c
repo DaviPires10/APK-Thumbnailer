@@ -40,19 +40,55 @@ static uint32_t hash_string(const char *str) {
   return hash;
 }
 
-static void hash_table_insert(StringPool *pool, uint32_t index) {
-  if (!pool || pool->table_capacity == 0 || !pool->strings || !pool->strings[index])
+static void string_pool_build_hash(StringPool *pool) {
+  if (!pool) {
     return;
-
-  uint32_t slot = hash_string(pool->strings[index]) % pool->table_capacity;
-  while (pool->hash_table[slot] != UINT32_MAX) {
-    ++slot;
-    slot %= pool->table_capacity;
   }
-  pool->hash_table[slot] = index;
+
+  if (pool->hash_table) {
+    free(pool->hash_table);
+  }
+  pool->hash_table     = NULL;
+  pool->table_capacity = 0;
+
+  if (pool->capacity == 0) {
+    return;
+  }
+
+  size_t capacity = pool->capacity < 8 ? pool->capacity * 2 : 8;
+  uint32_t *table = malloc(capacity * sizeof(uint32_t));
+  if (!table) {
+    return;
+  }
+
+  for (size_t i = 0; i < capacity; ++i) {
+    table[i] = UINT32_MAX;
+  }
+
+  pool->hash_table     = table;
+  pool->table_capacity = capacity;
+
+  for (size_t i = 0; i < pool->count; ++i) {
+    if (!pool->strings[i]) {
+      continue;
+    }
+
+    size_t slot = hash_string(pool->strings[i]) % capacity;
+    while (table[slot] != UINT32_MAX) {
+      ++slot;
+      slot %= pool->table_capacity;
+    }
+    table[slot] = i;
+  }
+
+  return;
 }
 
 static int decode_utf8_length(BinaryReader *reader) {
+  if (!reader) {
+    return 0;
+  }
+
   uint8_t len = read_u8(reader);
   if (len & 0x80) {
     uint8_t extra = read_u8(reader);
@@ -62,6 +98,10 @@ static int decode_utf8_length(BinaryReader *reader) {
 }
 
 static int decode_utf16_length(BinaryReader *reader) {
+  if (!reader) {
+    return 0;
+  }
+
   uint16_t len = read_u16(reader);
   if (len & 0x8000) {
     uint16_t extra = read_u16(reader);
@@ -102,123 +142,131 @@ static char *utf16_to_utf8(const uint16_t *str, size_t length) {
   return result;
 }
 
+static char *parse_utf8_string(BinaryReader *reader) {
+  int char_length = decode_utf8_length(reader);
+  int byte_length = decode_utf8_length(reader);
+  if (char_length == 0 || byte_length == 0) {
+    return NULL;
+  }
+
+  char *string = malloc(byte_length + 1);
+  if (!string) {
+    return NULL;
+  }
+
+  if (read_raw(reader, string, byte_length) != byte_length) {
+    free(string);
+    return NULL;
+  }
+
+  string[byte_length] = '\0';
+  return string;
+}
+
+static char *parse_utf16_string(BinaryReader *reader) {
+  int char_length = decode_utf16_length(reader);
+  if (char_length == 0) {
+    return NULL;
+  }
+
+  uint16_t *utf16_str = malloc(char_length * sizeof(uint16_t));
+  if (!utf16_str) {
+    return NULL;
+  }
+
+  for (size_t i = 0; i < char_length; ++i) {
+    utf16_str[i] = read_u16(reader);
+  }
+
+  char *string = utf16_to_utf8(utf16_str, char_length);
+  free(utf16_str);
+
+  return string;
+}
+
 StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   StringPool result = {0};
 
-  struct ResStringPool_header pool;
-  pool.strings_count = read_u32(reader);
-  pool.styles_count  = read_u32(reader);
-  pool.flags         = read_u32(reader);
-  pool.strings_start = read_u32(reader);
-  pool.styles_start  = read_u32(reader);
-
-  if (pool.strings_count == 0) {
+  if (!reader || !reader->data) {
     return result;
   }
-  uint32_t *offsets = malloc(pool.strings_count * sizeof(uint32_t));
-  char **strings    = malloc(pool.strings_count * sizeof(char *));
+
+  struct ResStringPool_header pool_header;
+  pool_header.strings_count = read_u32(reader);
+  pool_header.styles_count  = read_u32(reader);
+  pool_header.flags         = read_u32(reader);
+  pool_header.strings_start = read_u32(reader);
+  pool_header.styles_start  = read_u32(reader);
+
+  if (pool_header.strings_count == 0) {
+    return result;
+  }
+  uint32_t *offsets = malloc(pool_header.strings_count * sizeof(uint32_t));
+  char **strings    = malloc(pool_header.strings_count * sizeof(char *));
   if (!offsets || !strings) {
     free(offsets);
     free(strings);
     return result;
   }
 
-  read_raw(reader, offsets, pool.strings_count * sizeof(uint32_t));
+  read_raw(reader, offsets, pool_header.strings_count * sizeof(uint32_t));
 
-  for (size_t i = 0; i < pool.strings_count; ++i) {
-    seek(reader, chunk_start + pool.strings_start + offsets[i]);
-    if ((pool.flags & 0x100) != 0) {    // UTF-8
-      (void)decode_utf8_length(reader); // skip char length
-      int length = decode_utf8_length(reader);
-      strings[i] = malloc(length + 1);
-      if (strings[i]) {
-        read_raw(reader, strings[i], length + 1);
-      } else {
-        strings[i] = strdup("");
-      }
-    } else { // UTF-16
-      int length         = decode_utf16_length(reader);
-      uint16_t *utf16str = malloc(length * sizeof(uint16_t));
-      if (utf16str) {
-        read_raw(reader, utf16str, length * sizeof(uint16_t));
-        strings[i] = utf16_to_utf8(utf16str, length);
-        free(utf16str);
-      } else {
-        strings[i] = strdup("");
-      }
+  for (size_t i = 0; i < pool_header.strings_count; ++i) {
+    seek(reader, chunk_start + pool_header.strings_start + offsets[i]);
+
+    if (pool_header.flags & 0x100) {
+      strings[i] = parse_utf8_string(reader);
+    } else {
+      strings[i] = parse_utf16_string(reader);
+    }
+
+    if (!strings[i]) {
+      strings[i] = strdup("");
     }
   }
+
   free(offsets);
 
   result.strings  = strings;
-  result.count    = pool.strings_count;
-  result.capacity = pool.strings_count;
+  result.count    = pool_header.strings_count;
+  result.capacity = pool_header.strings_count;
 
-  // Build the initial hash map lookup cache from parsed data
-  if (result.count > 0) {
-    result.table_capacity = result.capacity * 2;
-    result.hash_table     = malloc(result.table_capacity * sizeof(uint32_t));
-    if (result.hash_table) {
-      for (size_t i = 0; i < result.table_capacity; ++i) {
-        result.hash_table[i] = UINT32_MAX;
-      }
-      for (size_t i = 0; i < result.count; ++i) {
-        if (result.strings[i]) {
-          hash_table_insert(&result, i);
-        }
-      }
-    }
-  }
+  string_pool_build_hash(&result);
 
   return result;
 }
 
-void string_pool_append(StringPool *pool, char *str) {
-  if (!pool || !str) {
-    return;
-  }
-
-  if (string_pool_get_index(*pool, str) != UINT32_MAX) {
+void string_pool_append(StringPool *pool, const char *str) {
+  if (!pool || !str || string_pool_get_index(*pool, str) != UINT32_MAX) {
     return;
   }
 
   if (pool->count >= pool->capacity) {
-    pool->capacity = pool->capacity ? pool->capacity * 2 : 8;
-    pool->strings  = realloc(pool->strings, pool->capacity * sizeof(char *));
-
-    // Scale and rehash the lookup cache to prevent collision degradation
-    size_t tmp_cap = pool->capacity * 2;
-    uint32_t *tmp  = malloc(tmp_cap * sizeof(uint32_t));
-    if (tmp) {
-      free(pool->hash_table);
-      pool->hash_table     = tmp;
-      pool->table_capacity = tmp_cap;
-
-      for (size_t i = 0; i < pool->table_capacity; ++i) {
-        tmp[i] = UINT32_MAX;
-      }
-
-      for (size_t i = 0; i < pool->count; ++i) {
-        if (pool->strings[i]) {
-          hash_table_insert(pool, i);
-        }
-      }
+    size_t tmp_cap = pool->capacity ? pool->capacity * 2 : 8;
+    if (tmp_cap < pool->capacity || tmp_cap > SIZE_MAX / sizeof(char *)) {
+      return;
     }
+
+    char **tmp = realloc(pool->strings, tmp_cap * sizeof(char *));
+    if (!tmp) {
+      return;
+    }
+
+    pool->strings  = tmp;
+    pool->capacity = tmp_cap;
   }
 
-  if (pool->strings) {
-    char *dup_str = strdup(str);
-
-    if (pool->hash_table && dup_str) {
-      pool->strings[pool->count] = dup_str;
-      hash_table_insert(pool, pool->count);
-    }
-    pool->count++;
+  char *dup_str = strdup(str);
+  if (!dup_str) {
+    return;
   }
+
+  pool->strings[pool->count++] = dup_str;
+  string_pool_build_hash(pool);
 }
 
 char *string_pool_get(StringPool pool, size_t index) {
-  if (index >= pool.count) {
+  if (!pool.strings || index >= pool.count) {
     return NULL;
   }
   return pool.strings[index];
@@ -247,8 +295,9 @@ void string_pool_get_indices_batch(StringPool pool,
                                    const char **strings,
                                    size_t count,
                                    uint32_t *out_indices) {
-  if (!out_indices)
+  if (!out_indices) {
     return;
+  }
 
   for (size_t i = 0; i < count; ++i) {
     if (!strings[i]) {
