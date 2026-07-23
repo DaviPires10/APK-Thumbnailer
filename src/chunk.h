@@ -25,10 +25,10 @@
 #include <stdint.h>
 
 enum {
-  RES_XML_NULL_TYPE        = 0x0000,
-  RES_XML_STRING_POOL_TYPE = 0x0001,
-  RES_XML_TABLE_TYPE       = 0x0002,
-  RES_XML_TYPE             = 0x0003,
+  RES_NULL_TYPE        = 0x0000,
+  RES_STRING_POOL_TYPE = 0x0001,
+  RES_TABLE_TYPE       = 0x0002,
+  RES_XML_TYPE         = 0x0003,
 
   // AXML specific Chunk Types
   RES_XML_START_NS_TYPE  = 0x0100,
@@ -39,9 +39,9 @@ enum {
   RES_XML_RES_MAP_TYPE   = 0x0180,
 
   // ARSC specific Chunk Types
-  RES_XML_PACKAGE_TYPE   = 0x0200,
-  RES_XML_TYPE_TYPE      = 0x0201,
-  RES_XML_TYPE_SPEC_TYPE = 0x0202,
+  RES_TABLE_PACKAGE_TYPE   = 0x0200,
+  RES_TABLE_TYPE_TYPE      = 0x0201,
+  RES_TABLE_TYPE_SPEC_TYPE = 0x0202,
 };
 
 typedef struct {

@@ -37,35 +37,35 @@ StringPool get_resource(const uint8_t *data, size_t size, uint32_t id) {
     ResChunk_header header = read_chunk_header(&reader);
 
     switch (header.type) {
-      case RES_XML_TABLE_TYPE: {
+      case RES_TABLE_TYPE: {
         skip(&reader, 4); // skip package_count
         break;
       }
 
-      case RES_XML_STRING_POOL_TYPE: {
+      case RES_STRING_POOL_TYPE: {
         if (pool.count == 0) {
           pool = parse_string_pool(&reader, chunk_start);
         }
         goto next_chunk;
       }
 
-      case RES_XML_PACKAGE_TYPE: {
+      case RES_TABLE_PACKAGE_TYPE: {
         skip_chunk_header_padding(&reader, header);
         break;
       }
 
-      case RES_XML_TYPE_TYPE: {
+      case RES_TABLE_TYPE_TYPE: {
         uint8_t id = read_u8(&reader);
         if (id != res_type)
           goto next_chunk;
 
-        (void)read_u8(&reader);
-        (void)read_u16(&reader);
+        (void)read_u8(&reader);  // res0
+        (void)read_u16(&reader); // res1
         uint32_t entry_count   = read_u32(&reader);
         uint32_t entries_start = read_u32(&reader);
 
-        uint32_t type_spec_size = read_u32(&reader);
-        skip(&reader, type_spec_size - 4);
+        uint32_t config_spec_size = read_u32(&reader);
+        skip(&reader, config_spec_size - 4);
 
         if (res_index >= entry_count)
           goto next_chunk;
