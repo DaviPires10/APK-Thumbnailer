@@ -118,7 +118,7 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
         break;
       }
 
-      case RES_XML_STRING_POOL_TYPE: {
+      case RES_STRING_POOL_TYPE: {
         if (pool.count == 0) {
           pool = parse_string_pool(&reader, chunk_start);
         }
