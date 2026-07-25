@@ -49,13 +49,13 @@ static void xml_add_child(XmlElement *parent, XmlElement *child) {
     return;
   }
 
-  if (parent->children_count >= parent->children_capacity) {
+  if (parent->child_count >= parent->children_capacity) {
     parent->children_capacity = parent->children_capacity ? parent->children_capacity * 2 : 8;
     parent->children = realloc(parent->children, parent->children_capacity * sizeof(XmlElement *));
   }
 
   if (parent->children) {
-    parent->children[parent->children_count++] = child;
+    parent->children[parent->child_count++] = child;
   }
 }
 
@@ -191,7 +191,7 @@ XmlElement *xml_find_child(XmlElement *elem, StringPool pool, const char *name) 
     return NULL;
   }
 
-  for (size_t i = 0; i < elem->children_count; ++i) {
+  for (size_t i = 0; i < elem->child_count; ++i) {
     XmlElement *child = elem->children[i];
     if (child->name.index == name_index) {
       return child;
@@ -217,7 +217,7 @@ void xml_free_element(XmlElement *elem) {
     free(elem->attributes);
   }
 
-  for (size_t i = 0; i < elem->children_count; i++) {
+  for (size_t i = 0; i < elem->child_count; i++) {
     xml_free_element(elem->children[i]);
   }
   free(elem->children);

@@ -23,8 +23,8 @@
 #include <string.h>
 
 struct ResStringPool_header {
-  uint32_t strings_count;
-  uint32_t styles_count;
+  uint32_t string_count;
+  uint32_t style_count;
   uint32_t flags;
   uint32_t strings_start;
   uint32_t styles_start;
@@ -192,26 +192,26 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   }
 
   struct ResStringPool_header pool_header;
-  pool_header.strings_count = read_u32(reader);
-  pool_header.styles_count  = read_u32(reader);
+  pool_header.string_count = read_u32(reader);
+  pool_header.style_count  = read_u32(reader);
   pool_header.flags         = read_u32(reader);
   pool_header.strings_start = read_u32(reader);
   pool_header.styles_start  = read_u32(reader);
 
-  if (pool_header.strings_count == 0) {
+  if (pool_header.string_count == 0) {
     return result;
   }
-  uint32_t *offsets = malloc(pool_header.strings_count * sizeof(uint32_t));
-  char **strings    = malloc(pool_header.strings_count * sizeof(char *));
+  uint32_t *offsets = malloc(pool_header.string_count * sizeof(uint32_t));
+  char **strings    = malloc(pool_header.string_count * sizeof(char *));
   if (!offsets || !strings) {
     free(offsets);
     free(strings);
     return result;
   }
 
-  read_raw(reader, offsets, pool_header.strings_count * sizeof(uint32_t));
+  read_raw(reader, offsets, pool_header.string_count * sizeof(uint32_t));
 
-  for (size_t i = 0; i < pool_header.strings_count; ++i) {
+  for (size_t i = 0; i < pool_header.string_count; ++i) {
     seek(reader, chunk_start + pool_header.strings_start + offsets[i]);
 
     if (pool_header.flags & 0x100) {
@@ -228,8 +228,8 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   free(offsets);
 
   result.strings  = strings;
-  result.count    = pool_header.strings_count;
-  result.capacity = pool_header.strings_count;
+  result.count    = pool_header.string_count;
+  result.capacity = pool_header.string_count;
 
   string_pool_build_hash(&result);
 

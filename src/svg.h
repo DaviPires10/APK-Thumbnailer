@@ -54,7 +54,7 @@ typedef struct SvgElement {
   size_t attr_count;
   SvgAttribute *attributes;
 
-  size_t children_count;
+  size_t child_count;
   struct SvgElement **children;
 } SvgElement;
 
@@ -67,7 +67,7 @@ typedef struct {
   float view_width;
   float view_height;
 
-  size_t defs_count;
+  size_t def_count;
   size_t defs_capacity;
   SvgElement *defs;
 

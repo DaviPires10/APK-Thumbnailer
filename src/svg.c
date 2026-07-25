@@ -252,7 +252,7 @@ static SvgElement *create_stop_element(float offset, SvgValue color) {
 
   stop->attributes[1].name  = "stop-color";
   stop->attributes[1].value = color;
-  stop->children_count      = 0;
+  stop->child_count      = 0;
   stop->children            = NULL;
 
   return stop;
@@ -352,14 +352,14 @@ svg_parse_group(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t *t
   result.attributes[0] = make_string_attr("transform", transform);
 
 children_append:
-  if (elem->children_count > 0) {
-    result.children = malloc(elem->children_count * sizeof(SvgElement *));
+  if (elem->child_count > 0) {
+    result.children = malloc(elem->child_count * sizeof(SvgElement *));
     if (result.children) {
-      for (size_t i = 0; i < elem->children_count; ++i) {
+      for (size_t i = 0; i < elem->child_count; ++i) {
         SvgElement *child = malloc(sizeof(SvgElement));
         if (child) {
           *child = svg_parse_element(doc, elem->children[i], pool, tag_indices);
-          result.children[result.children_count++] = child;
+          result.children[result.child_count++] = child;
         }
       }
     }
@@ -510,13 +510,13 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
   result.attributes[result.attr_count++] = make_string_attr("gradientUnits", "userSpaceOnUse");
 
   // handle stops
-  if (elem->children_count > 0) {
-    result.children = calloc(elem->children_count, sizeof(SvgElement *));
+  if (elem->child_count > 0) {
+    result.children = calloc(elem->child_count, sizeof(SvgElement *));
     if (!result.children) {
       return result;
     }
 
-    for (size_t i = 0; i < elem->children_count; ++i) {
+    for (size_t i = 0; i < elem->child_count; ++i) {
       XmlElement *item = elem->children[i];
 
       XmlAttribute *color_attr = xml_find_attribute(item, pool, "color");
@@ -529,7 +529,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
 
       SvgElement *stop = create_stop_element(offset, color);
       if (stop) {
-        result.children[result.children_count++] = stop;
+        result.children[result.child_count++] = stop;
       }
     }
   } else {
@@ -554,10 +554,10 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
       return result;
     }
 
-    result.children_count = stop_count;
+    result.child_count = stop_count;
     result.children       = malloc(stop_count * sizeof(SvgElement *));
     if (!result.children) {
-      result.children_count = 0;
+      result.child_count = 0;
       return result;
     }
 
@@ -636,20 +636,20 @@ void svg_document_add_def(SvgDocument *doc, SvgElement def) {
   if (!doc)
     return;
 
-  for (size_t i = 0; i < doc->defs_count; ++i) {
+  for (size_t i = 0; i < doc->def_count; ++i) {
     if (doc->defs[i].id == def.id && doc->defs[i].tag == TAG_UNKNOWN && def.tag != TAG_UNKNOWN) {
       doc->defs[i] = def;
       return;
     }
   }
 
-  if (doc->defs_count >= doc->defs_capacity) {
+  if (doc->def_count >= doc->defs_capacity) {
     doc->defs_capacity = doc->defs_capacity ? doc->defs_capacity * 2 : 4;
     doc->defs          = realloc(doc->defs, doc->defs_capacity * sizeof(SvgElement));
   }
 
   if (doc->defs) {
-    doc->defs[doc->defs_count++] = def;
+    doc->defs[doc->def_count++] = def;
   }
 }
 
@@ -668,7 +668,7 @@ SvgDocument svg_parse_xml(XmlElement *root, StringPool pool) {
   doc.view_width  = get_float_attr(root, pool, "viewportWidth");
   doc.view_height = get_float_attr(root, pool, "viewportHeight");
 
-  doc.vector_count = root->children_count;
+  doc.vector_count = root->child_count;
   if (doc.vector_count > 0) {
     doc.vector = calloc(doc.vector_count, sizeof(SvgElement));
     if (!doc.vector) {
@@ -702,7 +702,7 @@ void svg_free_element(SvgElement *elem) {
   }
 
   if (elem->children) {
-    for (size_t i = 0; i < elem->children_count; ++i) {
+    for (size_t i = 0; i < elem->child_count; ++i) {
       svg_free_element(elem->children[i]);
       elem->children[i] = NULL;
     }
@@ -711,7 +711,7 @@ void svg_free_element(SvgElement *elem) {
   }
 
   elem->attr_count     = 0;
-  elem->children_count = 0;
+  elem->child_count = 0;
 }
 
 void svg_free_document(SvgDocument *doc) {
@@ -719,13 +719,13 @@ void svg_free_document(SvgDocument *doc) {
     return;
 
   if (doc->defs) {
-    for (size_t i = 0; i < doc->defs_count; ++i) {
+    for (size_t i = 0; i < doc->def_count; ++i) {
       svg_free_element(&doc->defs[i]);
     }
     free(doc->defs);
     doc->defs = NULL;
   }
-  doc->defs_count    = 0;
+  doc->def_count    = 0;
   doc->defs_capacity = 0;
 
   if (doc->vector) {

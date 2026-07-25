@@ -117,9 +117,9 @@ void svg_write_element(FILE *fp, SvgElement *elem) {
     svg_write_attribute(fp, attr);
   }
 
-  if (elem->children_count > 0) {
+  if (elem->child_count > 0) {
     fprintf(fp, ">\n");
-    for (size_t i = 0; i < elem->children_count; ++i) {
+    for (size_t i = 0; i < elem->child_count; ++i) {
       svg_write_element(fp, elem->children[i]);
     }
     fprintf(fp, "</%s>\n", name);
@@ -136,10 +136,10 @@ void svg_write_document(FILE *fp, SvgDocument *doc) {
   fprintf(fp, "<svg width=\"%g\" height=\"%g\" viewBox=\"0 0 %g %g\" xmlns=\"%s\">\n", //
           doc->width, doc->height, doc->view_width, doc->view_height, doc->ns);
 
-  if (doc->defs_count > 0) {
+  if (doc->def_count > 0) {
     fprintf(fp, "<defs>\n");
 
-    for (size_t i = 0; i < doc->defs_count; ++i) {
+    for (size_t i = 0; i < doc->def_count; ++i) {
       svg_write_element(fp, &doc->defs[i]);
     }
     fprintf(fp, "</defs>\n");

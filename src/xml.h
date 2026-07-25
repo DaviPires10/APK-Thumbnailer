@@ -39,7 +39,7 @@ typedef struct XmlElement {
   size_t attr_count;
   XmlAttribute *attributes;
 
-  size_t children_count;
+  size_t child_count;
   size_t children_capacity;
   struct XmlElement **children;
 } XmlElement;

@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
       XmlElement *vector     = xml_parse_document(vector_data, vector_size, &vector_pool);
       SvgDocument svg        = svg_parse_xml(vector, vector_pool);
 
-      for (size_t i = 0; i < svg.defs_count; ++i) {
+      for (size_t i = 0; i < svg.def_count; ++i) {
         size_t def_size     = 0;
         StringPool def_pool = {0};
         char *def_path    = get_resource(resources_data, resources_size, svg.defs[i].id).strings[0];
