@@ -18,6 +18,15 @@
 
 #include "resource_value.h"
 
+#include <string.h>
+
+static const float RADIX_MULTS[4] = {
+    1.0f / (1 << 8),
+    1.0f / (1 << 15),
+    1.0f / (1 << 23),
+    1.0f / (1 << 31),
+};
+
 struct Res_value {
   uint16_t size;
   uint8_t res0;
@@ -26,12 +35,8 @@ struct Res_value {
   uint32_t data;
 };
 
-ResourceValue parse_resource_value(BinaryReader *reader) {
+ResourceValue parse_resource_value(BinaryReader *reader, StringPool pool) {
   ResourceValue value = {0};
-
-  if (!reader) {
-    return value;
-  }
 
   struct Res_value resource_value = {0};
   resource_value.size             = read_u16(reader);
@@ -40,7 +45,69 @@ ResourceValue parse_resource_value(BinaryReader *reader) {
   resource_value.data             = read_u32(reader);
 
   value.type = resource_value.type;
-  value.data = resource_value.data;
+  value.raw  = resource_value.data;
+
+  switch (value.type) {
+    case TYPE_REFERENCE:
+    case TYPE_FLOAT: // Why not take advantage of the way floats are represented in binary
+    case TYPE_INT_DEC:
+    case TYPE_INT_HEX:
+    case TYPE_INT_BOOLEAN:
+      value.data.integer = value.raw;
+      break;
+
+    case TYPE_STRING: {
+      char *string      = string_pool_get(pool, value.raw);
+      value.data.string = string ? strdup(string) : strdup("");
+      break;
+    }
+
+    case TYPE_DIMENSION: {
+      int radix           = (value.raw >> 4) & 0x3;
+      int mantissa        = value.raw & 0xFFFFFF00;
+      float ret           = mantissa * RADIX_MULTS[radix];
+      value.data.floating = ret;
+      break;
+    }
+
+    case TYPE_FRACTION: {
+      int radix           = (value.raw >> 4) & 0x3;
+      int mantissa        = value.raw & 0xFFFFFF00;
+      float ret           = (mantissa * RADIX_MULTS[radix]) * 100.0f;
+      value.data.floating = ret;
+      break;
+    }
+
+    case TYPE_INT_COLOR_ARGB8: {
+      uint32_t alpha     = value.raw >> 24;
+      uint32_t rgb       = value.raw << 8;
+      uint32_t ret       = rgb | alpha;
+      value.data.integer = ret;
+      break;
+    }
+
+    case TYPE_INT_COLOR_RGB8:
+      value.data.integer = value.raw & 0x00FFFFFF;
+      break;
+
+    case TYPE_INT_COLOR_ARGB4: {
+      uint32_t alpha     = value.raw >> 12;
+      uint32_t rgb       = value.raw << 4;
+      uint32_t ret       = rgb | alpha;
+      value.data.integer = ret;
+      break;
+    }
+
+    case TYPE_INT_COLOR_RGB4:
+      value.data.integer = value.raw & 0x0FFF;
+      break;
+
+    default:
+      value.type         = TYPE_NULL;
+      value.raw          = 0;
+      value.data.integer = 0;
+      break;
+  }
 
   return value;
 }

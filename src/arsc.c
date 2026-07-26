@@ -84,7 +84,7 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
             break;
           }
         }
-        
+
         if (!type) {
           if (pkg->type_count >= pkg->types_capacity) {
             size_t capacity = pkg->types_capacity ? pkg->types_capacity * 2 : 8;
@@ -125,10 +125,10 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
 
           if (!(flags & 0x0001)) {
             seek(&reader, entry_start + config_size);
-            type->entries[i] = parse_resource_value(&reader);
+            type->entries[i] = parse_resource_value(&reader, table.global_pool);
           }
         }
-        
+
         goto next_chunk;
       }
 
@@ -167,7 +167,7 @@ ResourceValue arsc_table_resolve(const ArscTable table, uint32_t id, int depth) 
         val = pkg->types[i].entries[entry_index];
 
         if (val.type == TYPE_REFERENCE) {
-          return arsc_table_resolve(table, val.data, depth + 1);
+          return arsc_table_resolve(table, val.raw, depth + 1);
         }
         return val;
       }

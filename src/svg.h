@@ -34,17 +34,8 @@ typedef enum {
 } SvgTag;
 
 typedef struct {
-  uint8_t type;
-  union {
-    char *string;
-    int32_t integer;
-    float floating;
-  } data;
-} SvgValue;
-
-typedef struct {
   const char *name;
-  SvgValue value;
+  ResourceValue value;
 } SvgAttribute;
 
 typedef struct SvgElement {

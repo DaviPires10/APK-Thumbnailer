@@ -44,7 +44,7 @@ typedef struct XmlElement {
   struct XmlElement **children;
 } XmlElement;
 
-XmlElement *xml_parse_element(BinaryReader *reader);
+XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool);
 void xml_free_element(XmlElement *elem);
 XmlElement *xml_find_child(XmlElement *elem, StringPool pool, const char *name);
 bool xml_element_has_name(XmlElement *elem, StringPool pool, const char *name);

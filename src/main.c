@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
       goto cleanup;
     }
-    icon_id = icon->value.data;
+    icon_id = icon->value.raw;
 
     string_pool_free(&manifest_pool);
     xml_free_element(manifest);
@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
         continue;
       }
       char *vector_path =
-          get_resource(resources_data, resources_size, drawable->value.data).strings[0];
+          get_resource(resources_data, resources_size, drawable->value.raw).strings[0];
 
       const char *dot = strrchr(vector_path, '.');
       if (dot && strcmp(dot, ".xml") != 0) {

@@ -18,6 +18,8 @@
 
 #include "svg.h"
 
+#include "resource_value.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,13 +32,6 @@ typedef struct {
   const char *xml_name;
   const char *svg_name;
 } SvgMap;
-
-static const float RADIX_MULTS[4] = {
-    1.0f / (1 << 8),
-    1.0f / (1 << 15),
-    1.0f / (1 << 23),
-    1.0f / (1 << 31),
-};
 
 static const char *tags[] = {
     "group", "path", "clip-path", "item", "gradient",
@@ -100,99 +95,12 @@ map_get(XmlAttribute *attr, StringPool pool, size_t map_count, const SvgMap map[
   return NULL;
 }
 
-static SvgValue svg_parse_value(SvgDocument *doc, StringPool pool, ResourceValue resource) {
-  SvgValue value = {0};
-
-  value.type    = resource.type;
-  uint32_t data = resource.data;
-
-  switch (value.type) {
-    case TYPE_REFERENCE:
-      if (doc) {
-        SvgElement def = {
-            .id  = data,
-            .tag = TAG_UNKNOWN,
-        };
-        svg_document_add_def(doc, def);
-      }
-      value.data.integer = data;
-      break;
-
-    case TYPE_STRING: {
-      char *s           = string_pool_get(pool, data);
-      value.data.string = s ? strdup(s) : strdup("");
-      break;
-    }
-
-    case TYPE_FLOAT: {
-      float *ret = &value.data.floating;
-      memcpy(ret, &data, sizeof(float));
-      break;
-    }
-    case TYPE_INT_DEC:
-    case TYPE_INT_HEX:
-      value.data.integer = data;
-      break;
-
-    case TYPE_DIMENSION: {
-      int radix           = (data >> 4) & 0x3;
-      int mantissa        = data & 0xFFFFFF00;
-      float ret           = mantissa * RADIX_MULTS[radix];
-      value.data.floating = ret;
-      break;
-    }
-
-    case TYPE_FRACTION: {
-      int radix           = (data >> 4) & 0x3;
-      int mantissa        = data & 0xFFFFFF00;
-      float ret           = (mantissa * RADIX_MULTS[radix]) * 100.0f;
-      value.data.floating = ret;
-      break;
-    }
-
-    case TYPE_INT_BOOLEAN:
-      value.data.string = data ? strdup("true") : strdup("false");
-      break;
-
-    case TYPE_INT_COLOR_ARGB8: {
-      uint32_t alpha     = data >> 24;
-      uint32_t rgb       = data << 8;
-      uint32_t ret       = rgb | alpha;
-      value.data.integer = ret;
-      break;
-    }
-
-    case TYPE_INT_COLOR_RGB8:
-      value.data.integer = data & 0x00FFFFFF;
-      break;
-
-    case TYPE_INT_COLOR_ARGB4: {
-      uint32_t alpha     = data >> 12;
-      uint32_t rgb       = data << 4;
-      uint32_t ret       = rgb | alpha;
-      value.data.integer = ret;
-      break;
-    }
-
-    case TYPE_INT_COLOR_RGB4:
-      value.data.integer = data & 0x0FFF;
-      break;
-
-    default:
-      value.type = TYPE_NULL;
-      break;
-  }
-
-  return value;
-}
-
 static float get_float_attr(XmlElement *elem, StringPool pool, const char *name) {
   float result = 0.0f;
 
   XmlAttribute *attr = xml_find_attribute(elem, pool, name);
   if (attr) {
-    SvgValue value = svg_parse_value(NULL, pool, attr->value);
-    result         = value.data.floating;
+    result = attr->value.data.floating;
   }
 
   return result;
@@ -223,15 +131,16 @@ static SvgAttribute make_enum_attr(XmlAttribute *xml_attr,
     return attr;
   }
 
-  if (xml_attr->value.data < str_count) {
+  if (xml_attr->value.data.integer < str_count) {
     attr.value.type        = TYPE_STRING;
-    attr.value.data.string = strdup(str_values[xml_attr->value.data]);
+    attr.value.raw         = xml_attr->value.raw;
+    attr.value.data.string = strdup(str_values[xml_attr->value.data.integer]);
   }
 
   return attr;
 }
 
-static SvgElement *create_stop_element(float offset, SvgValue color) {
+static SvgElement *create_stop_element(float offset, ResourceValue color) {
   SvgElement *stop = malloc(sizeof(SvgElement));
   if (!stop) {
     return NULL;
@@ -252,7 +161,7 @@ static SvgElement *create_stop_element(float offset, SvgValue color) {
 
   stop->attributes[1].name  = "stop-color";
   stop->attributes[1].value = color;
-  stop->child_count      = 0;
+  stop->child_count         = 0;
   stop->children            = NULL;
 
   return stop;
@@ -406,7 +315,18 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
     SvgAttribute attr = {0};
 
     attr.name  = map_get(xml_attr, pool, countof(path_attrs), path_attrs);
-    attr.value = svg_parse_value(doc, pool, xml_attr->value);
+    attr.value = xml_attr->value;
+    if (attr.value.type == TYPE_STRING) {
+      attr.value.data.string = strdup(xml_attr->value.data.string);
+    } else if (attr.value.type == TYPE_REFERENCE) {
+      if (doc) {
+        SvgElement def = {
+            .id  = xml_attr->value.raw,
+            .tag = TAG_UNKNOWN,
+        };
+        svg_document_add_def(doc, def);
+      }
+    }
 
     result.attributes[result.attr_count++] = attr;
   }
@@ -438,7 +358,7 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
   return result;
 }
 
-static SvgElement svg_parse_clip_path(SvgDocument *doc, XmlElement *elem, StringPool pool) {
+static SvgElement svg_parse_clip_path(XmlElement *elem, StringPool pool) {
   SvgElement result = {0};
   result.tag        = TAG_CLIP_PATH;
   result.id         = UINT32_MAX;
@@ -450,9 +370,10 @@ static SvgElement svg_parse_clip_path(SvgDocument *doc, XmlElement *elem, String
     return result;
   }
 
-  result.attr_count          = 1;
-  result.attributes[0].name  = "d";
-  result.attributes[0].value = svg_parse_value(doc, pool, path_data->value);
+  result.attr_count                      = 1;
+  result.attributes[0].name              = "d";
+  result.attributes[0].value             = path_data->value;
+  result.attributes[0].value.data.string = strdup(path_data->value.data.string);
 
   return result;
 }
@@ -471,9 +392,9 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     return result;
   }
 
-  if (type->value.data == 0) {
+  if (type->value.raw == 0) {
     result.tag = TAG_LINEAR_GRADIENT;
-  } else if (type->value.data == 1) {
+  } else if (type->value.raw == 1) {
     result.tag = TAG_RADIAL_GRADIENT;
   } else {
     return result;
@@ -502,7 +423,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     if (!attr.name) {
       continue;
     }
-    attr.value = svg_parse_value(NULL, pool, xml_attr->value);
+    attr.value = xml_attr->value;
 
     result.attributes[result.attr_count++] = attr;
   }
@@ -524,8 +445,8 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
         continue;
       }
 
-      float offset   = get_float_attr(item, pool, "offset");
-      SvgValue color = svg_parse_value(NULL, pool, color_attr->value);
+      float offset        = get_float_attr(item, pool, "offset");
+      ResourceValue color = color_attr->value;
 
       SvgElement *stop = create_stop_element(offset, color);
       if (stop) {
@@ -555,7 +476,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     }
 
     result.child_count = stop_count;
-    result.children       = malloc(stop_count * sizeof(SvgElement *));
+    result.children    = malloc(stop_count * sizeof(SvgElement *));
     if (!result.children) {
       result.child_count = 0;
       return result;
@@ -565,8 +486,8 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
     float inc    = (stop_count > 1) ? 1.0f / (stop_count - 1) : 0.0f;
 
     for (size_t i = 0; i < stop_count; ++i) {
-      SvgValue color   = svg_parse_value(NULL, pool, color_items[i]->value);
-      SvgElement *stop = create_stop_element(offset, color);
+      ResourceValue color = color_items[i]->value;
+      SvgElement *stop    = create_stop_element(offset, color);
       if (!stop) {
         svg_free_element(&result);
         memset(&result, 0, sizeof(result));
@@ -608,7 +529,7 @@ svg_parse_element(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t 
       return result;
 
     case TAG_CLIP_PATH: {
-      result = svg_parse_clip_path(doc, elem, pool);
+      result = svg_parse_clip_path(elem, pool);
       return result;
     }
 
@@ -692,7 +613,7 @@ void svg_free_element(SvgElement *elem) {
   if (elem->attributes) {
     for (size_t i = 0; i < elem->attr_count; ++i) {
       SvgAttribute attr = elem->attributes[i];
-      if (attr.value.type == TYPE_STRING || attr.value.type == TYPE_INT_BOOLEAN) {
+      if (attr.value.type == TYPE_STRING) {
         free(attr.value.data.string);
         attr.value.data.string = NULL;
       }
@@ -710,7 +631,7 @@ void svg_free_element(SvgElement *elem) {
     elem->children = NULL;
   }
 
-  elem->attr_count     = 0;
+  elem->attr_count  = 0;
   elem->child_count = 0;
 }
 
@@ -725,7 +646,7 @@ void svg_free_document(SvgDocument *doc) {
     free(doc->defs);
     doc->defs = NULL;
   }
-  doc->def_count    = 0;
+  doc->def_count     = 0;
   doc->defs_capacity = 0;
 
   if (doc->vector) {

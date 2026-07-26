@@ -20,6 +20,7 @@
 #define RESOURCE_VALUE_H
 
 #include "binary_reader.h"
+#include "string_pool.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -46,9 +47,14 @@ enum : uint8_t {
 
 typedef struct {
   uint8_t type;
-  uint32_t data;
+  uint32_t raw;
+  union {
+    char *string;
+    int32_t integer;
+    float floating;
+  } data;
 } ResourceValue;
 
-ResourceValue parse_resource_value(BinaryReader *reader);
+ResourceValue parse_resource_value(BinaryReader *reader, StringPool pool);
 
 #endif

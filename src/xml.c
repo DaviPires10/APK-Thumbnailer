@@ -59,12 +59,14 @@ static void xml_add_child(XmlElement *parent, XmlElement *child) {
   }
 }
 
-XmlElement *xml_parse_element(BinaryReader *reader) {
+XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool) {
   XmlElement *result = calloc(1, sizeof(XmlElement));
 
   if (!result) {
     return NULL;
   };
+
+  size_t elem_start = reader->pos;
 
   struct ResXMLTree_attrExt node;
   node.ns.index   = read_u32(reader);
@@ -73,9 +75,6 @@ XmlElement *xml_parse_element(BinaryReader *reader) {
   node.attr_size  = read_u16(reader);
   node.attr_count = read_u16(reader);
 
-  // Skip id_index, class_index, style_index
-  skip(reader, 3 * sizeof(uint16_t));
-
   if (node.attr_count > 0) {
     result->attributes = malloc(node.attr_count * sizeof(XmlAttribute));
     if (!result->attributes) {
@@ -83,6 +82,8 @@ XmlElement *xml_parse_element(BinaryReader *reader) {
       return NULL;
     }
   }
+
+  seek(reader, elem_start + node.attr_start);
   for (size_t i = 0; i < node.attr_count; ++i) {
     struct ResXMLTree_attribute attr;
     attr.ns.index        = read_u32(reader);
@@ -90,7 +91,7 @@ XmlElement *xml_parse_element(BinaryReader *reader) {
     attr.raw_value.index = read_u32(reader);
 
     result->attributes[i].name.index = attr.name.index;
-    result->attributes[i].value      = parse_resource_value(reader);
+    result->attributes[i].value      = parse_resource_value(reader, pool);
   }
 
   result->name.index = node.name.index;
@@ -122,12 +123,13 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
         if (pool.count == 0) {
           pool = parse_string_pool(&reader, chunk_start);
         }
+
         goto next_chunk;
       }
 
       case RES_XML_START_TAG_TYPE: {
         skip(&reader, 8); // skip line number and comment
-        XmlElement *elem = xml_parse_element(&reader);
+        XmlElement *elem = xml_parse_element(&reader, pool);
 
         if (!elem) {
           goto next_chunk;
