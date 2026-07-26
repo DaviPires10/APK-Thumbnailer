@@ -42,7 +42,8 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
         if (!table.packages) {
           return table;
         }
-        break;
+
+        goto next_chunk;
       }
 
       case RES_STRING_POOL_TYPE: {
@@ -69,8 +70,8 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
           goto next_chunk;
         }
 
-        ArscEntry *entries = NULL;
-        ArscType *type     = NULL;
+        ResourceValue *entries = NULL;
+        ArscType *type         = NULL;
 
         uint8_t type_id = read_u8(&reader);
         skip(&reader, 3);
@@ -78,11 +79,12 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
         uint32_t entries_start = read_u32(&reader);
 
         for (uint32_t i = 0; i < pkg->type_count; ++i) {
-          if (pkg->types[i].id == type_id) {
+          if (pkg->types[i].type_id == type_id) {
             type = &pkg->types[i];
             break;
           }
         }
+        
         if (!type) {
           if (pkg->type_count >= pkg->types_capacity) {
             size_t capacity = pkg->types_capacity ? pkg->types_capacity * 2 : 8;
@@ -93,14 +95,14 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
             pkg->types          = types;
             pkg->types_capacity = capacity;
 
-            entries = calloc(entry_count, sizeof(ArscEntry));
+            entries = calloc(entry_count, sizeof(ResourceValue));
             if (!entries) {
               goto next_chunk;
             }
           }
 
           type              = &pkg->types[pkg->type_count++];
-          type->id          = type_id;
+          type->type_id     = type_id;
           type->entry_count = entry_count;
           if (type->entries) {
             free(type->entries); // For now we'll overwrite the entries
@@ -121,13 +123,12 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
           uint16_t config_size = read_u16(&reader);
           uint16_t flags       = read_u16(&reader);
 
-          type->entries[i].index = i;
-
           if (!(flags & 0x0001)) {
             seek(&reader, entry_start + config_size);
-            type->entries[i].value = parse_resource_value(&reader);
+            type->entries[i] = parse_resource_value(&reader);
           }
         }
+        
         goto next_chunk;
       }
 
@@ -143,6 +144,7 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
 
 ResourceValue arsc_table_resolve(const ArscTable table, uint32_t id, int depth) {
   ResourceValue val = {0};
+
   if (depth > 20) {
     return val;
   }
@@ -160,11 +162,11 @@ ResourceValue arsc_table_resolve(const ArscTable table, uint32_t id, int depth) 
   }
 
   for (size_t i = 0; i < pkg->type_count; ++i) {
-    if (pkg->types[i].id == type_id) {
+    if (pkg->types[i].type_id == type_id) {
       if (entry_index < pkg->types[i].entry_count) {
-        val = pkg->types[i].entries[entry_index].value;
+        val = pkg->types[i].entries[entry_index];
 
-        if (val.type == TYPE_REFERENCE || val.type == TYPE_ATTRIBUTE) {
+        if (val.type == TYPE_REFERENCE) {
           return arsc_table_resolve(table, val.data, depth + 1);
         }
         return val;

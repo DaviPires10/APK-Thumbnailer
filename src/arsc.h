@@ -23,15 +23,9 @@
 #include "string_pool.h"
 
 typedef struct {
-  uint16_t index;
-  uint32_t key;
+  uint32_t type_id;
 
-  ResourceValue value;
-} ArscEntry;
-typedef struct {
-  uint32_t id;
-
-  ArscEntry *entries;
+  ResourceValue *entries;
   size_t entry_count;
 } ArscType;
 
