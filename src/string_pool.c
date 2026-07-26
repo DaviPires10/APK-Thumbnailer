@@ -55,7 +55,7 @@ static void string_pool_build_hash(StringPool *pool) {
     return;
   }
 
-  size_t capacity = pool->capacity < 8 ? pool->capacity * 2 : 8;
+  size_t capacity = pool->capacity < 8 ? 8 : pool->capacity * 2;
   uint32_t *table = malloc(capacity * sizeof(uint32_t));
   if (!table) {
     return;
@@ -192,8 +192,8 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
   }
 
   struct ResStringPool_header pool_header;
-  pool_header.string_count = read_u32(reader);
-  pool_header.style_count  = read_u32(reader);
+  pool_header.string_count  = read_u32(reader);
+  pool_header.style_count   = read_u32(reader);
   pool_header.flags         = read_u32(reader);
   pool_header.strings_start = read_u32(reader);
   pool_header.styles_start  = read_u32(reader);
