@@ -15,6 +15,7 @@ magick_dep = dependency('GraphicsMagickWand', version: '>=1.0')
 deps = [zip_dep, magick_dep]
 
 src = files(
+    'src/arsc.c',
     'src/apk.c',
     'src/binary_reader.c',
     'src/chunk.c',

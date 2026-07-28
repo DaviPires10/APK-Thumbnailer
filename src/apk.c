@@ -18,87 +18,8 @@
 
 #include "apk.h"
 
-#include "chunk.h"
-
 #include <stdlib.h>
 #include <string.h>
-
-StringPool get_resource(const uint8_t *data, size_t size, uint32_t id) {
-  BinaryReader reader = set_buffer(data, size);
-
-  uint32_t res_type  = (id >> 16) & 0xff;
-  uint32_t res_index = id & 0xffff;
-
-  StringPool pool  = {0};
-  StringPool icons = {0};
-
-  while (!at_end(&reader)) {
-    uint32_t chunk_start   = reader.pos;
-    ResChunk_header header = read_chunk_header(&reader);
-
-    switch (header.type) {
-      case RES_TABLE_TYPE: {
-        skip(&reader, 4); // skip package_count
-        break;
-      }
-
-      case RES_STRING_POOL_TYPE: {
-        if (pool.count == 0) {
-          pool = parse_string_pool(&reader, chunk_start);
-        }
-        goto next_chunk;
-      }
-
-      case RES_TABLE_PACKAGE_TYPE: {
-        skip_chunk_header_padding(&reader, header);
-        break;
-      }
-
-      case RES_TABLE_TYPE_TYPE: {
-        uint8_t id = read_u8(&reader);
-        if (id != res_type)
-          goto next_chunk;
-
-        (void)read_u8(&reader);  // res0
-        (void)read_u16(&reader); // res1
-        uint32_t entry_count   = read_u32(&reader);
-        uint32_t entries_start = read_u32(&reader);
-
-        uint32_t config_spec_size = read_u32(&reader);
-        skip(&reader, config_spec_size - 4);
-
-        if (res_index >= entry_count)
-          goto next_chunk;
-
-        skip(&reader, res_index * sizeof(uint32_t));
-        uint32_t entry_index = read_u32(&reader);
-
-        if (entry_index == UINT32_MAX)
-          goto next_chunk;
-
-        seek(&reader, chunk_start + entries_start + entry_index);
-        // skip entry_size entry_flag entry_key
-        // typed data, skip size zero data_type
-        skip(&reader, 2 * sizeof(uint32_t));
-        skip(&reader, 4);
-        uint32_t string_index = read_u32(&reader);
-
-        char *path = string_pool_get(pool, string_index);
-        string_pool_append(&icons, path);
-
-        goto next_chunk;
-      }
-
-      next_chunk:
-      default:
-        skip_chunk(&reader, chunk_start, header);
-        break;
-    }
-  }
-  string_pool_free(&pool);
-
-  return icons;
-}
 
 uint8_t *apk_extract_file(zip_t *za, const char *file_name, size_t *data_size) {
   zip_stat_t sb;
