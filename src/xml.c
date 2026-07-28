@@ -167,8 +167,7 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
 
       next_chunk:
       default:
-        seek(&reader, chunk_start);
-        skip(&reader, header.size);
+        skip_chunk(&reader, chunk_start, header);
         break;
     }
   }

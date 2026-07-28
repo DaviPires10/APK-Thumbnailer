@@ -52,6 +52,8 @@ typedef struct {
 
 ResChunk_header read_chunk_header(BinaryReader *reader);
 void skip_chunk(BinaryReader *reader, size_t chunk_start_pos, ResChunk_header header);
-void skip_chunk_header_padding(BinaryReader *buf, ResChunk_header header);
+void skip_chunk_header_padding(BinaryReader *reader,
+                               size_t chunk_start_pos,
+                               ResChunk_header header);
 
 #endif

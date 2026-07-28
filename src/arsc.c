@@ -43,7 +43,7 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
           return table;
         }
 
-        goto next_chunk;
+        break;
       }
 
       case RES_STRING_POOL_TYPE: {
@@ -62,7 +62,8 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
         pkg     = &table.packages[table.package_count++];
         pkg->id = read_u32(&reader);
 
-        goto next_chunk;
+        skip_chunk_header_padding(&reader, chunk_start, header);
+        break;
       }
 
       case RES_TABLE_TYPE_TYPE: {
@@ -94,20 +95,17 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
             }
             pkg->types          = types;
             pkg->types_capacity = capacity;
+          }
 
-            entries = calloc(entry_count, sizeof(ResourceValue));
-            if (!entries) {
-              goto next_chunk;
-            }
+          entries = calloc(entry_count, sizeof(ResourceValue));
+          if (!entries) {
+            goto next_chunk;
           }
 
           type              = &pkg->types[pkg->type_count++];
           type->type_id     = type_id;
           type->entry_count = entry_count;
-          if (type->entries) {
-            free(type->entries); // For now we'll overwrite the entries
-          }
-          type->entries = entries;
+          type->entries     = entries;
         }
 
         for (size_t i = 0; i < entry_count; ++i) {
