@@ -53,10 +53,12 @@ static void xml_add_child(XmlElement *parent, XmlElement *child) {
     parent->children_capacity = parent->children_capacity ? parent->children_capacity * 2 : 8;
     parent->children = realloc(parent->children, parent->children_capacity * sizeof(XmlElement *));
   }
-
-  if (parent->children) {
-    parent->children[parent->child_count++] = child;
+  if (!parent->children) {
+    xml_free_element(child);
+    return;
   }
+
+  parent->children[parent->child_count++] = child;
 }
 
 XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool) {
