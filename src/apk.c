@@ -21,31 +21,51 @@
 #include <stdlib.h>
 #include <string.h>
 
-uint8_t *apk_extract_file(zip_t *za, const char *file_name, size_t *data_size) {
-  zip_stat_t sb;
-  int err = zip_stat(za, file_name, 0, &sb);
-  if (err == -1) {
-    zip_error_t *error = zip_get_error(za);
-    fprintf(stderr, "Failed to stat %s: %s\n", file_name, zip_error_strerror(error));
+uint8_t *apk_extract_file(zip_t *apk, const char *file_name, size_t *data_size) {
+  if (!apk || !file_name || !data_size) {
+    return NULL;
+  }
+
+  zip_stat_t stat_buf;
+  int stat_err = zip_stat(apk, file_name, 0, &stat_buf);
+  if (stat_err == -1) {
+    zip_error_t *error = zip_get_error(apk);
+    fprintf(stderr, "Failed to stat '%s': %s\n", file_name, zip_error_strerror(error));
     zip_error_fini(error);
     return NULL;
   }
 
-  zip_file_t *zf = zip_fopen(za, file_name, 0);
-  if (zf == NULL) {
-    zip_error_t *error = zip_get_error(za);
-    fprintf(stderr, "Failed to open file for reading %s\n", zip_error_strerror(error));
+  zip_file_t *zip_file = zip_fopen(apk, file_name, 0);
+  if (!zip_file) {
+    zip_error_t *error = zip_get_error(apk);
+    fprintf(stderr, "Failed to open '%s' for reading: %s\n", file_name, zip_error_strerror(error));
     zip_error_fini(error);
     return NULL;
   }
 
-  uint8_t *data = malloc(sb.size);
-  zip_int64_t f = zip_fread(zf, data, sb.size);
-  zip_fclose(zf);
-  if (f == -1) {
-    fprintf(stderr, "Failed to read file\n");
+  size_t file_size = stat_buf.size;
+  uint8_t *buffer  = malloc(file_size);
+  if (!buffer) {
+    fprintf(stderr, "Out of memory while reading '%s'\n", file_name);
+    zip_fclose(zip_file);
     return NULL;
   }
-  *data_size = sb.size;
-  return data;
+
+  zip_int64_t bytes_read = zip_fread(zip_file, buffer, file_size);
+  zip_fclose(zip_file);
+
+  if (bytes_read == -1) {
+    fprintf(stderr, "Failed to read data from '%s'\n", file_name);
+    free(buffer);
+    return NULL;
+  }
+
+  if (bytes_read != file_size) {
+    fprintf(stderr, "Read %zu bytes from '%s', expected %zu\n", bytes_read, file_name, file_size);
+    free(buffer);
+    return NULL;
+  }
+
+  *data_size = file_size;
+  return buffer;
 }

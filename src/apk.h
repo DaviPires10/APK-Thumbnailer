@@ -21,6 +21,6 @@
 
 #include <zip.h>
 
-uint8_t *apk_extract_file(zip_t *za, const char *file_name, size_t *data_size);
+uint8_t *apk_extract_file(zip_t *apk, const char *file_name, size_t *data_size);
 
 #endif
