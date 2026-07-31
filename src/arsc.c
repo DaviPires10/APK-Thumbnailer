@@ -215,13 +215,7 @@ void arsc_table_free(ArscTable *table) {
 
   for (size_t i = 0; i < table->package_count; ++i) {
     for (size_t j = 0; j < table->packages[i].type_count; ++j) {
-      ArscType *type = &table->packages[i].types[j];
-      for (size_t k = 0; k < type->entry_count; ++k) {
-        if (type->entries[k].type == TYPE_STRING) {
-          free(type->entries[k].data.string);
-        }
-      }
-      free(type->entries);
+      free(table->packages[i].types[j].entries);
     }
     free(table->packages[i].types);
   }

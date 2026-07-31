@@ -58,7 +58,7 @@ ResourceValue parse_resource_value(BinaryReader *reader, StringPool pool) {
 
     case TYPE_STRING: {
       char *string      = string_pool_get(pool, value.raw);
-      value.data.string = string ? strdup(string) : strdup("");
+      value.data.string = string ? string : strdup("");
       break;
     }
 
