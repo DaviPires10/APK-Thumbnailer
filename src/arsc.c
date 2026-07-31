@@ -71,13 +71,15 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
           goto next_chunk;
         }
 
-        ResourceValue *entries = NULL;
-        ArscType *type         = NULL;
+        ArscType *type = NULL;
 
         uint8_t type_id = read_u8(&reader);
-        skip(&reader, 3);
+        uint8_t flags   = read_u8(&reader);
+        skip(&reader, 2);
         uint32_t entry_count   = read_u32(&reader);
         uint32_t entries_start = read_u32(&reader);
+
+        bool is_sparse = (flags & 0x01) != 0;
 
         for (uint32_t i = 0; i < pkg->type_count; ++i) {
           if (pkg->types[i].type_id == type_id) {
@@ -97,7 +99,7 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
             pkg->types_capacity = capacity;
           }
 
-          entries = calloc(entry_count, sizeof(ResourceValue));
+          ResourceValue *entries = calloc(entry_count, sizeof(ResourceValue));
           if (!entries) {
             goto next_chunk;
           }
@@ -110,20 +112,46 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
 
         for (size_t i = 0; i < entry_count; ++i) {
           seek(&reader, chunk_start + header.header_size + i * sizeof(uint32_t));
-          uint32_t offset = read_u32(&reader);
-          if (offset == UINT32_MAX) {
+
+          uint32_t offset;
+          uint32_t entry_index;
+
+          if (is_sparse) {
+            entry_index = read_u16(&reader);
+            offset      = read_u16(&reader) * sizeof(uint32_t);
+          } else {
+            offset      = read_u32(&reader);
+            entry_index = i;
+          }
+
+          if (offset == UINT32_MAX || (is_sparse && offset == 0xFFFF * sizeof(uint32_t))) {
             continue;
+          }
+
+          if (entry_index >= type->entry_count) {
+            size_t tmp_count           = entry_index + 1;
+            ResourceValue *tmp_entries = realloc(type->entries, tmp_count * sizeof(ResourceValue));
+            if (tmp_entries) {
+              tmp_entries[type->entry_count].type         = TYPE_NULL;
+              tmp_entries[type->entry_count].raw          = 0;
+              tmp_entries[type->entry_count].data.integer = 0;
+
+              type->entries     = tmp_entries;
+              type->entry_count = tmp_count;
+            } else {
+              continue;
+            }
           }
 
           size_t entry_start = chunk_start + entries_start + offset;
           seek(&reader, entry_start);
 
           uint16_t config_size = read_u16(&reader);
-          uint16_t flags       = read_u16(&reader);
+          uint16_t entry_flags = read_u16(&reader);
 
-          if (!(flags & 0x0001)) {
+          if (!(entry_flags & 0x0001)) {
             seek(&reader, entry_start + config_size);
-            type->entries[i] = parse_resource_value(&reader, table.global_pool);
+            type->entries[entry_index] = parse_resource_value(&reader, table.global_pool);
           }
         }
 
@@ -158,6 +186,9 @@ ResourceValue arsc_table_resolve(const ArscTable table, uint32_t id, int depth) 
       break;
     }
   }
+  if (!pkg) {
+    return val;
+  }
 
   for (size_t i = 0; i < pkg->type_count; ++i) {
     if (pkg->types[i].type_id == type_id) {
@@ -184,7 +215,13 @@ void arsc_table_free(ArscTable *table) {
 
   for (size_t i = 0; i < table->package_count; ++i) {
     for (size_t j = 0; j < table->packages[i].type_count; ++j) {
-      free(table->packages[i].types[j].entries);
+      ArscType *type = &table->packages[i].types[j];
+      for (size_t k = 0; k < type->entry_count; ++k) {
+        if (type->entries[k].type == TYPE_STRING) {
+          free(type->entries[k].data.string);
+        }
+      }
+      free(type->entries);
     }
     free(table->packages[i].types);
   }
