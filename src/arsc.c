@@ -119,7 +119,8 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
           if (is_sparse) {
             entry_index = read_u16(&reader);
             offset      = read_u16(&reader) * sizeof(uint32_t);
-          } else {
+          }
+          else {
             offset      = read_u32(&reader);
             entry_index = i;
           }
@@ -138,7 +139,8 @@ ArscTable parse_arsc_table(const uint8_t *data, size_t size) {
 
               type->entries     = tmp_entries;
               type->entry_count = tmp_count;
-            } else {
+            }
+            else {
               continue;
             }
           }

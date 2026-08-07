@@ -11,7 +11,10 @@ AlignOperands: Align
 # Blank Line and Block Options
 AllowShortBlocksOnASingleLine: true
 AllowShortFunctionsOnASingleLine: None
-BreakBeforeBraces: Attach
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: Never
+  BeforeElse: true
 
 # Indentation Options
 IndentCaseLabels: true

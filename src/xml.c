@@ -139,7 +139,8 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
 
         if (stack_top == 0) {
           root = elem;
-        } else {
+        }
+        else {
           elem->parent = stack[stack_top - 1];
           xml_add_child(elem->parent, elem);
         }
@@ -177,7 +178,8 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
 
   if (out_pool) {
     *out_pool = pool;
-  } else {
+  }
+  else {
     string_pool_free(&pool);
   }
 

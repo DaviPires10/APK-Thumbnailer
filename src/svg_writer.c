@@ -124,7 +124,8 @@ void svg_write_element(FILE *fp, SvgElement *elem) {
       svg_write_element(fp, elem->children[i]);
     }
     fprintf(fp, "</%s>\n", name);
-  } else {
+  }
+  else {
     fprintf(fp, "/>\n");
   }
 }

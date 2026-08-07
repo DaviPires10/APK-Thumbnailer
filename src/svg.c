@@ -245,7 +245,8 @@ svg_parse_group(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t *t
     if (props.pivotX != 0.0f || props.pivotY != 0.0f) {
       len += snprintf(&transform[len], sizeof(transform) - len, "rotate(%g, %g, %g)",
                       props.rotation, props.pivotX, props.pivotY);
-    } else {
+    }
+    else {
       len += snprintf(&transform[len], sizeof(transform) - len, "rotate(%g)", props.rotation);
     }
   }
@@ -318,7 +319,8 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
     attr.value = xml_attr->value;
     if (attr.value.type == TYPE_STRING) {
       attr.value.data.string = strdup(xml_attr->value.data.string);
-    } else if (attr.value.type == TYPE_REFERENCE) {
+    }
+    else if (attr.value.type == TYPE_REFERENCE) {
       if (doc) {
         SvgElement def = {
             .id  = xml_attr->value.raw,
@@ -394,9 +396,11 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
 
   if (type->value.raw == 0) {
     result.tag = TAG_LINEAR_GRADIENT;
-  } else if (type->value.raw == 1) {
+  }
+  else if (type->value.raw == 1) {
     result.tag = TAG_RADIAL_GRADIENT;
-  } else {
+  }
+  else {
     return result;
   }
 
@@ -410,7 +414,8 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
   if (result.tag == TAG_LINEAR_GRADIENT) {
     map       = linear_grad_attrs;
     map_count = countof(linear_grad_attrs);
-  } else {
+  }
+  else {
     map       = radial_grad_attrs;
     map_count = countof(radial_grad_attrs);
   }
@@ -453,7 +458,8 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
         result.children[result.child_count++] = stop;
       }
     }
-  } else {
+  }
+  else {
     XmlAttribute *color_items[3] = {0};
     size_t stop_count            = 0;
 

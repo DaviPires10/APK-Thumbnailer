@@ -60,7 +60,8 @@ void extract_image(MagickWand **image, const char *file_name, uint8_t *data, siz
     if (*image)
       DestroyMagickWand(*image);
     *image = icon;
-  } else {
+  }
+  else {
     DestroyMagickWand(icon);
   }
 }
@@ -206,7 +207,8 @@ int main(int argc, char **argv) {
       if (!drawable) {
         drawable = xml_find_attribute(inset, ic_laucher_pool, "src");
       }
-    } else {
+    }
+    else {
       drawable = xml_find_attribute(fg, ic_laucher_pool, "drawable");
     }
 
@@ -266,7 +268,8 @@ int main(int argc, char **argv) {
           free(ic_launcher_data);
 
           goto cleanup;
-        } else {
+        }
+        else {
           path = vector_path;
 
           string_pool_free(&ic_laucher_pool);
@@ -280,7 +283,8 @@ int main(int argc, char **argv) {
     string_pool_free(&ic_laucher_pool);
     xml_free_element(ic_launcher);
     free(ic_launcher_data);
-  } else {
+  }
+  else {
     path = icon_path;
     goto image_processing;
   }

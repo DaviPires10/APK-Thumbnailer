@@ -125,10 +125,12 @@ static char *utf16_to_utf8(const uint16_t *str, size_t length) {
 
     if (c < 0x80) {
       *p++ = c;
-    } else if (c < 0x800) {
+    }
+    else if (c < 0x800) {
       *p++ = 0xC0 | (c >> 6);
       *p++ = 0x80 | (c & 0x3F);
-    } else {
+    }
+    else {
       *p++ = 0xE0 | (c >> 12);
       *p++ = 0x80 | ((c >> 6) & 0x3F);
       *p++ = 0x80 | (c & 0x3F);
@@ -216,7 +218,8 @@ StringPool parse_string_pool(BinaryReader *reader, size_t chunk_start) {
 
     if (pool_header.flags & 0x100) {
       strings[i] = parse_utf8_string(reader);
-    } else {
+    }
+    else {
       strings[i] = parse_utf16_string(reader);
     }
 
