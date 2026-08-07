@@ -49,22 +49,26 @@ static void xml_add_child(XmlElement *parent, XmlElement *child) {
     return;
   }
 
-  if (parent->children_count >= parent->children_capacity) {
+  if (parent->child_count >= parent->children_capacity) {
     parent->children_capacity = parent->children_capacity ? parent->children_capacity * 2 : 8;
     parent->children = realloc(parent->children, parent->children_capacity * sizeof(XmlElement *));
   }
-
-  if (parent->children) {
-    parent->children[parent->children_count++] = child;
+  if (!parent->children) {
+    xml_free_element(child);
+    return;
   }
+
+  parent->children[parent->child_count++] = child;
 }
 
-XmlElement *xml_parse_element(BinaryReader *reader) {
+XmlElement *xml_parse_element(BinaryReader *reader, StringPool pool) {
   XmlElement *result = calloc(1, sizeof(XmlElement));
 
   if (!result) {
     return NULL;
   };
+
+  size_t elem_start = reader->pos;
 
   struct ResXMLTree_attrExt node;
   node.ns.index   = read_u32(reader);
@@ -73,9 +77,6 @@ XmlElement *xml_parse_element(BinaryReader *reader) {
   node.attr_size  = read_u16(reader);
   node.attr_count = read_u16(reader);
 
-  // Skip id_index, class_index, style_index
-  skip(reader, 3 * sizeof(uint16_t));
-
   if (node.attr_count > 0) {
     result->attributes = malloc(node.attr_count * sizeof(XmlAttribute));
     if (!result->attributes) {
@@ -83,6 +84,8 @@ XmlElement *xml_parse_element(BinaryReader *reader) {
       return NULL;
     }
   }
+
+  seek(reader, elem_start + node.attr_start);
   for (size_t i = 0; i < node.attr_count; ++i) {
     struct ResXMLTree_attribute attr;
     attr.ns.index        = read_u32(reader);
@@ -90,7 +93,7 @@ XmlElement *xml_parse_element(BinaryReader *reader) {
     attr.raw_value.index = read_u32(reader);
 
     result->attributes[i].name.index = attr.name.index;
-    result->attributes[i].value      = parse_resource_value(reader);
+    result->attributes[i].value      = parse_resource_value(reader, pool);
   }
 
   result->name.index = node.name.index;
@@ -122,12 +125,13 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
         if (pool.count == 0) {
           pool = parse_string_pool(&reader, chunk_start);
         }
+
         goto next_chunk;
       }
 
       case RES_XML_START_TAG_TYPE: {
         skip(&reader, 8); // skip line number and comment
-        XmlElement *elem = xml_parse_element(&reader);
+        XmlElement *elem = xml_parse_element(&reader, pool);
 
         if (!elem) {
           goto next_chunk;
@@ -165,8 +169,7 @@ XmlElement *xml_parse_document(const uint8_t *data, size_t size, StringPool *out
 
       next_chunk:
       default:
-        seek(&reader, chunk_start);
-        skip(&reader, header.size);
+        skip_chunk(&reader, chunk_start, header);
         break;
     }
   }
@@ -191,7 +194,7 @@ XmlElement *xml_find_child(XmlElement *elem, StringPool pool, const char *name) 
     return NULL;
   }
 
-  for (size_t i = 0; i < elem->children_count; ++i) {
+  for (size_t i = 0; i < elem->child_count; ++i) {
     XmlElement *child = elem->children[i];
     if (child->name.index == name_index) {
       return child;
@@ -217,7 +220,7 @@ void xml_free_element(XmlElement *elem) {
     free(elem->attributes);
   }
 
-  for (size_t i = 0; i < elem->children_count; i++) {
+  for (size_t i = 0; i < elem->child_count; i++) {
     xml_free_element(elem->children[i]);
   }
   free(elem->children);

@@ -34,17 +34,8 @@ typedef enum {
 } SvgTag;
 
 typedef struct {
-  uint8_t type;
-  union {
-    char *string;
-    int32_t integer;
-    float floating;
-  } data;
-} SvgValue;
-
-typedef struct {
   const char *name;
-  SvgValue value;
+  ResourceValue value;
 } SvgAttribute;
 
 typedef struct SvgElement {
@@ -54,7 +45,7 @@ typedef struct SvgElement {
   size_t attr_count;
   SvgAttribute *attributes;
 
-  size_t children_count;
+  size_t child_count;
   struct SvgElement **children;
 } SvgElement;
 
@@ -67,7 +58,7 @@ typedef struct {
   float view_width;
   float view_height;
 
-  size_t defs_count;
+  size_t def_count;
   size_t defs_capacity;
   SvgElement *defs;
 

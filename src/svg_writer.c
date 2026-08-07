@@ -19,8 +19,8 @@
 #include "svg_writer.h"
 
 void svg_write_attribute(FILE *fp, SvgAttribute attr) {
-  const char *name = attr.name;
-  SvgValue value   = attr.value;
+  const char *name    = attr.name;
+  ResourceValue value = attr.value;
 
   switch (attr.value.type) {
     case TYPE_REFERENCE:
@@ -28,13 +28,16 @@ void svg_write_attribute(FILE *fp, SvgAttribute attr) {
       break;
 
     case TYPE_STRING:
-    case TYPE_INT_BOOLEAN:
       fprintf(fp, "%s=\"%s\"", name, value.data.string);
       break;
 
     case TYPE_FLOAT:
     case TYPE_DIMENSION:
       fprintf(fp, "%s=\"%g\"", name, value.data.floating);
+      break;
+
+    case TYPE_FRACTION:
+      fprintf(fp, "%s=\"%g%%\"", name, value.data.floating);
       break;
 
     case TYPE_INT_DEC:
@@ -45,15 +48,13 @@ void svg_write_attribute(FILE *fp, SvgAttribute attr) {
       fprintf(fp, "%s=\"%#08X\"", name, value.data.integer);
       break;
 
-    case TYPE_FRACTION: {
-      fprintf(fp, "%s=\"%g%%\"", name, value.data.floating);
+    case TYPE_INT_BOOLEAN:
+      fprintf(fp, "%s=\"%s\"", name, value.data.integer ? "true" : "false");
       break;
-    }
 
-    case TYPE_INT_COLOR_ARGB8: {
+    case TYPE_INT_COLOR_ARGB8:
       fprintf(fp, "%s=\"#%08X\"", name, value.data.integer);
       break;
-    }
 
     case TYPE_INT_COLOR_RGB8:
       fprintf(fp, "%s=\"#%06X\"", name, value.data.integer);
@@ -117,9 +118,9 @@ void svg_write_element(FILE *fp, SvgElement *elem) {
     svg_write_attribute(fp, attr);
   }
 
-  if (elem->children_count > 0) {
+  if (elem->child_count > 0) {
     fprintf(fp, ">\n");
-    for (size_t i = 0; i < elem->children_count; ++i) {
+    for (size_t i = 0; i < elem->child_count; ++i) {
       svg_write_element(fp, elem->children[i]);
     }
     fprintf(fp, "</%s>\n", name);
@@ -136,10 +137,10 @@ void svg_write_document(FILE *fp, SvgDocument *doc) {
   fprintf(fp, "<svg width=\"%g\" height=\"%g\" viewBox=\"0 0 %g %g\" xmlns=\"%s\">\n", //
           doc->width, doc->height, doc->view_width, doc->view_height, doc->ns);
 
-  if (doc->defs_count > 0) {
+  if (doc->def_count > 0) {
     fprintf(fp, "<defs>\n");
 
-    for (size_t i = 0; i < doc->defs_count; ++i) {
+    for (size_t i = 0; i < doc->def_count; ++i) {
       svg_write_element(fp, &doc->defs[i]);
     }
     fprintf(fp, "</defs>\n");

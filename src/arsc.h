@@ -16,24 +16,38 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "chunk.h"
+#ifndef ARSC_H
+#define ARSC_H
 
-ResChunk_header read_chunk_header(BinaryReader *reader) {
-  ResChunk_header header;
-  header.type        = read_u16(reader);
-  header.header_size = read_u16(reader);
-  header.size        = read_u32(reader);
-  return header;
-}
+#include "resource_value.h"
+#include "string_pool.h"
 
-void skip_chunk(BinaryReader *reader, size_t chunk_start_pos, ResChunk_header header) {
-  seek(reader, chunk_start_pos);
-  skip(reader, header.size);
-}
+typedef struct {
+  uint32_t type_id;
 
-void skip_chunk_header_padding(BinaryReader *reader,
-                               size_t chunk_start_pos,
-                               ResChunk_header header) {
-  seek(reader, chunk_start_pos);
-  skip(reader, header.header_size);
-}
+  ResourceValue *entries;
+  size_t entry_count;
+} ArscType;
+
+typedef struct {
+  uint8_t id;
+
+  ArscType *types;
+  size_t type_count;
+  size_t types_capacity;
+} ArscPackage;
+
+typedef struct {
+  StringPool global_pool;
+
+  ArscPackage *packages;
+  size_t package_count;
+} ArscTable;
+
+ArscTable parse_arsc_table(const uint8_t *data, size_t size);
+
+ResourceValue arsc_table_resolve(ArscTable table, uint32_t id, int depth);
+
+void arsc_table_free(ArscTable *table);
+
+#endif

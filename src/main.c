@@ -17,6 +17,8 @@
  */
 
 #include "apk.h"
+#include "arsc.h"
+#include "resource_value.h"
 #include "string_pool.h"
 #include "svg.h"
 #include "svg_writer.h"
@@ -36,7 +38,7 @@ static const struct option long_opts[] = {
     {0,         0,                 0, 0  }
 };
 
-void extract_image(MagickWand **image, char *file_name, uint8_t *data, size_t size) {
+void extract_image(MagickWand **image, const char *file_name, uint8_t *data, size_t size) {
   MagickWand *icon = NewMagickWand();
 
   if (!MagickReadImageBlob(icon, data, size)) {
@@ -102,10 +104,8 @@ int main(int argc, char **argv) {
         exit(EXIT_SUCCESS);
         break;
       case '?':
-        print_usage(argv[0]);
-        exit(EXIT_FAILURE);
-        break;
       default:
+        print_usage(argv[0]);
         exit(EXIT_FAILURE);
         break;
     }
@@ -120,11 +120,11 @@ int main(int argc, char **argv) {
   XmlElement *manifest     = NULL;
   uint8_t *manifest_data   = NULL;
   uint8_t *resources_data  = NULL;
-  StringPool icons         = {0};
   MagickWand *image        = NULL;
   ExceptionType wand_error = 0;
   char *wand_err_desc      = NULL;
   bool magick_initialised  = false;
+  char *path               = NULL;
 
   za = zip_open(in_path, ZIP_RDONLY, &err);
   if (!za) {
@@ -135,14 +135,13 @@ int main(int argc, char **argv) {
     goto cleanup;
   }
 
-  size_t manifest_size;
-  manifest_data = apk_extract_file(za, "AndroidManifest.xml", &manifest_size);
+  size_t manifest_size = 0;
+  manifest_data        = apk_extract_file(za, "AndroidManifest.xml", &manifest_size);
   if (!manifest_data) {
     fprintf(stderr, "Failed to read AndroidManifest.xml\n");
     goto cleanup;
   }
 
-  // get icon_id from AndroidManifest.xml
   uint32_t icon_id = UINT32_MAX;
   {
     StringPool manifest_pool = {0};
@@ -153,7 +152,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Failed to find icon ID inside AndroidManifest.xml\n");
       goto cleanup;
     }
-    icon_id = icon->value.data;
+    icon_id = icon->value.raw;
 
     string_pool_free(&manifest_pool);
     xml_free_element(manifest);
@@ -166,100 +165,141 @@ int main(int argc, char **argv) {
     printf("Found target Icon Reference ID: %#X\n", icon_id);
   }
 
-  size_t resources_size;
-  resources_data = apk_extract_file(za, "resources.arsc", &resources_size);
+  size_t resources_size = 0;
+  resources_data        = apk_extract_file(za, "resources.arsc", &resources_size);
   if (!resources_data) {
     fprintf(stderr, "Failed to read resources.arsc\n");
     goto cleanup;
   }
+  ArscTable resources = parse_arsc_table(resources_data, resources_size);
 
-  // get icon_paths from resources.arsc
-  icons = get_resource(resources_data, resources_size, icon_id);
-  if (!icons.strings) {
-    fprintf(stderr, "Failed to resolve ID 0x%08X to any file paths in resources.arsc\n", icon_id);
+  ResourceValue resolved_icon = arsc_table_resolve(resources, icon_id, 1);
+  char *icon_path             = resolved_icon.data.string;
+  if (!icon_path) {
+    fprintf(stderr, "Failed to resolve icon path from resources.arsc\n");
     goto cleanup;
+  }
+
+  if (verbose) {
+    printf("Resolved icon path: %s\n", icon_path);
   }
 
   InitializeMagick(NULL);
   magick_initialised = true;
 
-  for (size_t i = 0; i < icons.count; ++i) {
-    char *path = icons.strings[i];
-    if (!path) {
-      continue;
+  const char *dot = strrchr(icon_path, '.');
+  if (dot && strcmp(dot, ".xml") == 0) {
+    size_t ic_laucher          = 0;
+    StringPool ic_laucher_pool = {0};
+    uint8_t *ic_launcher_data  = apk_extract_file(za, icon_path, &ic_laucher);
+    if (!ic_launcher_data) {
+      fprintf(stderr, "Failed to extract adaptive icon XML: %s\n", icon_path);
+      goto cleanup;
     }
 
-    const char *dot = strrchr(path, '.');
-    if (dot && strcmp(dot, ".xml") == 0) {
-      StringPool ic_laucher_pool = {0};
-      size_t ic_laucher_size     = 0;
-      uint8_t *ic_laucher_data   = apk_extract_file(za, path, &ic_laucher_size);
-      XmlElement *ic_launcher =
-          xml_parse_document(ic_laucher_data, ic_laucher_size, &ic_laucher_pool);
-      XmlElement *fg         = xml_find_child(ic_launcher, ic_laucher_pool, "foreground");
-      XmlAttribute *drawable = xml_find_attribute(fg, ic_laucher_pool, "drawable");
+    XmlElement *ic_launcher = xml_parse_document(ic_launcher_data, ic_laucher, &ic_laucher_pool);
+    XmlElement *fg          = xml_find_child(ic_launcher, ic_laucher_pool, "foreground");
+    XmlAttribute *drawable  = NULL;
+    if (fg->child_count > 0) {
+      XmlElement *inset = fg->children[0];
+      drawable          = xml_find_attribute(inset, ic_laucher_pool, "drawable");
       if (!drawable) {
-        continue;
+        drawable = xml_find_attribute(inset, ic_laucher_pool, "src");
       }
-      char *vector_path =
-          get_resource(resources_data, resources_size, drawable->value.data).strings[0];
+    } else {
+      drawable = xml_find_attribute(fg, ic_laucher_pool, "drawable");
+    }
 
-      const char *dot = strrchr(vector_path, '.');
-      if (dot && strcmp(dot, ".xml") != 0) {
-        if (i > 0) {
-          path = icons.strings[i - 1];
+    if (drawable) {
+      if (verbose) {
+        printf("Found foreground Reference ID: %#X\n", drawable->value.raw);
+      }
+
+      ResourceValue resolved_fg = arsc_table_resolve(resources, drawable->value.raw, 1);
+      char *vector_path         = resolved_fg.data.string;
+
+      if (vector_path) {
+        if (verbose) {
+          printf("Resolved foreground path: %s\n", vector_path);
+        }
+        const char *v_dot = strrchr(vector_path, '.');
+        if (v_dot && strcmp(v_dot, ".xml") == 0) {
+          size_t vector_size      = 0;
+          StringPool vector_pool  = {0};
+          uint8_t *vector_data    = apk_extract_file(za, vector_path, &vector_size);
+          XmlElement *vector_elem = xml_parse_document(vector_data, vector_size, &vector_pool);
+          SvgDocument svg         = svg_parse_xml(vector_elem, vector_pool);
+
+          for (size_t i = 0; i < svg.def_count; ++i) {
+            size_t def_size            = 0;
+            StringPool def_pool        = {0};
+            ResourceValue resolved_def = arsc_table_resolve(resources, svg.defs[i].id, 1);
+            char *def_path             = resolved_def.data.string;
+            if (def_path) {
+              uint8_t *def_data   = apk_extract_file(za, def_path, &def_size);
+              XmlElement *xml_def = xml_parse_document(def_data, def_size, &def_pool);
+              SvgElement def      = svg_parse_def(xml_def, def_pool, svg.defs[i].id);
+              svg_document_add_def(&svg, def);
+              free(def_data);
+            }
+          }
+
+          FILE *fp = fopen(out_path, "w");
+          if (fp) {
+            if (size > svg.width) {
+              svg.width  = size;
+              svg.height = size;
+            }
+            svg_write_document(fp, &svg);
+            fclose(fp);
+          }
+
+          if (verbose) {
+            printf("Thumbnail successfully written to %s\n", out_path);
+          }
+
+          string_pool_free(&vector_pool);
+          xml_free_element(vector_elem);
+          free(vector_data);
+          string_pool_free(&ic_laucher_pool);
+          xml_free_element(ic_launcher);
+          free(ic_launcher_data);
+
+          goto cleanup;
         } else {
           path = vector_path;
+
+          string_pool_free(&ic_laucher_pool);
+          xml_free_element(ic_launcher);
+          free(ic_launcher_data);
+
+          goto image_processing;
         }
-        goto image_proccessing;
       }
-
-      StringPool vector_pool = {0};
-      size_t vector_size     = 0;
-      uint8_t *vector_data   = apk_extract_file(za, vector_path, &vector_size);
-      XmlElement *vector     = xml_parse_document(vector_data, vector_size, &vector_pool);
-      SvgDocument svg        = svg_parse_xml(vector, vector_pool);
-
-      for (size_t i = 0; i < svg.defs_count; ++i) {
-        size_t def_size     = 0;
-        StringPool def_pool = {0};
-        char *def_path    = get_resource(resources_data, resources_size, svg.defs[i].id).strings[0];
-        uint8_t *def_data = apk_extract_file(za, def_path, &def_size);
-        XmlElement *xml_def = xml_parse_document(def_data, def_size, &def_pool);
-        SvgElement def      = svg_parse_def(xml_def, def_pool, svg.defs[i].id);
-        svg_document_add_def(&svg, def);
-      }
-
-      FILE *fp = fopen(out_path, "w");
-      if (!fp) {
-        return EXIT_FAILURE;
-      }
-      if (size > svg.width) {
-        svg.width  = size;
-        svg.height = size;
-      }
-
-      svg_write_document(fp, &svg);
-
-      fclose(fp);
-      goto cleanup;
-    } else
-    image_proccessing: {
-      size_t icon_size;
-      uint8_t *icon_data = apk_extract_file(za, path, &icon_size);
-      if (!icon_data) {
-        fprintf(stderr, "Failed to extract icon file from ZIP: %s\n", path);
-        goto cleanup;
-      }
-
-      extract_image(&image, path, icon_data, icon_size);
-      free(icon_data);
     }
+    string_pool_free(&ic_laucher_pool);
+    xml_free_element(ic_launcher);
+    free(ic_launcher_data);
+  } else {
+    path = icon_path;
+    goto image_processing;
   }
-  string_pool_free(&icons);
 
-  zip_close(za);
-  za = NULL;
+image_processing: {
+  if (!path) {
+    fprintf(stderr, "No valid icon path specified for image processing.\n");
+    goto cleanup;
+  }
+
+  size_t icon_size   = 0;
+  uint8_t *icon_data = apk_extract_file(za, path, &icon_size);
+  if (!icon_data) {
+    fprintf(stderr, "Failed to extract icon file from ZIP: %s\n", path);
+    goto cleanup;
+  }
+  extract_image(&image, path, icon_data, icon_size);
+  free(icon_data);
+}
 
   if (!image) {
     fprintf(stderr, "Failed to load any valid non-XML thumbnail image formats.\n");
@@ -285,18 +325,16 @@ int main(int argc, char **argv) {
     goto cleanup;
   }
 
-  if (verbose)
+  if (verbose) {
     printf("Thumbnail successfully written to %s\n", out_path);
+  }
 
 cleanup:
+  arsc_table_free(&resources);
   if (image)
     DestroyMagickWand(image);
   if (magick_initialised)
     DestroyMagick();
-
-  if (icons.strings)
-    string_pool_free(&icons);
-
   if (resources_data)
     free(resources_data);
   if (manifest_data)

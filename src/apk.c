@@ -18,113 +18,54 @@
 
 #include "apk.h"
 
-#include "chunk.h"
-
 #include <stdlib.h>
 #include <string.h>
 
-StringPool get_resource(const uint8_t *data, size_t size, uint32_t id) {
-  BinaryReader reader = set_buffer(data, size);
-
-  uint32_t res_type  = (id >> 16) & 0xff;
-  uint32_t res_index = id & 0xffff;
-
-  StringPool pool  = {0};
-  StringPool icons = {0};
-
-  while (!at_end(&reader)) {
-    uint32_t chunk_start   = reader.pos;
-    ResChunk_header header = read_chunk_header(&reader);
-
-    switch (header.type) {
-      case RES_TABLE_TYPE: {
-        skip(&reader, 4); // skip package_count
-        break;
-      }
-
-      case RES_STRING_POOL_TYPE: {
-        if (pool.count == 0) {
-          pool = parse_string_pool(&reader, chunk_start);
-        }
-        goto next_chunk;
-      }
-
-      case RES_TABLE_PACKAGE_TYPE: {
-        skip_chunk_header_padding(&reader, header);
-        break;
-      }
-
-      case RES_TABLE_TYPE_TYPE: {
-        uint8_t id = read_u8(&reader);
-        if (id != res_type)
-          goto next_chunk;
-
-        (void)read_u8(&reader);  // res0
-        (void)read_u16(&reader); // res1
-        uint32_t entry_count   = read_u32(&reader);
-        uint32_t entries_start = read_u32(&reader);
-
-        uint32_t config_spec_size = read_u32(&reader);
-        skip(&reader, config_spec_size - 4);
-
-        if (res_index >= entry_count)
-          goto next_chunk;
-
-        skip(&reader, res_index * sizeof(uint32_t));
-        uint32_t entry_index = read_u32(&reader);
-
-        if (entry_index == UINT32_MAX)
-          goto next_chunk;
-
-        seek(&reader, chunk_start + entries_start + entry_index);
-        // skip entry_size entry_flag entry_key
-        // typed data, skip size zero data_type
-        skip(&reader, 2 * sizeof(uint32_t));
-        skip(&reader, 4);
-        uint32_t string_index = read_u32(&reader);
-
-        char *path = string_pool_get(pool, string_index);
-        string_pool_append(&icons, path);
-
-        goto next_chunk;
-      }
-
-      next_chunk:
-      default:
-        skip_chunk(&reader, chunk_start, header);
-        break;
-    }
+uint8_t *apk_extract_file(zip_t *apk, const char *file_name, size_t *data_size) {
+  if (!apk || !file_name || !data_size) {
+    return NULL;
   }
-  string_pool_free(&pool);
 
-  return icons;
-}
-
-uint8_t *apk_extract_file(zip_t *za, const char *file_name, size_t *data_size) {
-  zip_stat_t sb;
-  int err = zip_stat(za, file_name, 0, &sb);
-  if (err == -1) {
-    zip_error_t *error = zip_get_error(za);
-    fprintf(stderr, "Failed to stat %s: %s\n", file_name, zip_error_strerror(error));
+  zip_stat_t stat_buf;
+  int stat_err = zip_stat(apk, file_name, 0, &stat_buf);
+  if (stat_err == -1) {
+    zip_error_t *error = zip_get_error(apk);
+    fprintf(stderr, "Failed to stat '%s': %s\n", file_name, zip_error_strerror(error));
     zip_error_fini(error);
     return NULL;
   }
 
-  zip_file_t *zf = zip_fopen(za, file_name, 0);
-  if (zf == NULL) {
-    zip_error_t *error = zip_get_error(za);
-    fprintf(stderr, "Failed to open file for reading %s\n", zip_error_strerror(error));
+  zip_file_t *zip_file = zip_fopen(apk, file_name, 0);
+  if (!zip_file) {
+    zip_error_t *error = zip_get_error(apk);
+    fprintf(stderr, "Failed to open '%s' for reading: %s\n", file_name, zip_error_strerror(error));
     zip_error_fini(error);
     return NULL;
   }
 
-  uint8_t *data = malloc(sb.size);
-  zip_int64_t f = zip_fread(zf, data, sb.size);
-  zip_fclose(zf);
-  if (f == -1) {
-    fprintf(stderr, "Failed to read file\n");
+  size_t file_size = stat_buf.size;
+  uint8_t *buffer  = malloc(file_size);
+  if (!buffer) {
+    fprintf(stderr, "Out of memory while reading '%s'\n", file_name);
+    zip_fclose(zip_file);
     return NULL;
   }
-  *data_size = sb.size;
-  return data;
+
+  zip_int64_t bytes_read = zip_fread(zip_file, buffer, file_size);
+  zip_fclose(zip_file);
+
+  if (bytes_read == -1) {
+    fprintf(stderr, "Failed to read data from '%s'\n", file_name);
+    free(buffer);
+    return NULL;
+  }
+
+  if (bytes_read != file_size) {
+    fprintf(stderr, "Read %zu bytes from '%s', expected %zu\n", bytes_read, file_name, file_size);
+    free(buffer);
+    return NULL;
+  }
+
+  *data_size = file_size;
+  return buffer;
 }
