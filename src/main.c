@@ -203,15 +203,25 @@ int main(int argc, char **argv) {
     if (fg->child_count > 0) {
       XmlElement *inset = fg->children[0];
       drawable          = xml_find_attribute(inset, ic_laucher_pool, "drawable");
+      if (!drawable) {
+        drawable = xml_find_attribute(inset, ic_laucher_pool, "src");
+      }
     } else {
       drawable = xml_find_attribute(fg, ic_laucher_pool, "drawable");
     }
 
     if (drawable) {
+      if (verbose) {
+        printf("Found foreground Reference ID: %#X\n", drawable->value.raw);
+      }
+
       ResourceValue resolved_fg = arsc_table_resolve(resources, drawable->value.raw, 1);
       char *vector_path         = resolved_fg.data.string;
 
       if (vector_path) {
+        if (verbose) {
+          printf("Resolved foreground path: %s\n", vector_path);
+        }
         const char *v_dot = strrchr(vector_path, '.');
         if (v_dot && strcmp(v_dot, ".xml") == 0) {
           size_t vector_size      = 0;
@@ -320,6 +330,7 @@ image_processing: {
   }
 
 cleanup:
+  arsc_table_free(&resources);
   if (image)
     DestroyMagickWand(image);
   if (magick_initialised)
