@@ -1,6 +1,6 @@
-/* SPDX-License-Identifier: GPL-3.0-only or GPL-3.0-or-later
+/* SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Copyright (C) 2026 Davi Pires <davipiresalvesdacunha2@gmail.com>.
+ * Copyright (C) 2026 Davi Pires <davipiresalvesdacunha2@gmail.com>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
