@@ -211,7 +211,12 @@ bool xml_element_has_name(XmlElement *elem, StringPool pool, const char *name) {
     return false;
   }
 
-  return (elem->name.index == string_pool_get_index(pool, name));
+  char *elem_name = string_pool_get(pool, elem->name.index);
+  if (strcmp(elem_name, name) == 0) {
+    return true;
+  }
+
+  return false;
 }
 
 void xml_free_element(XmlElement *elem) {

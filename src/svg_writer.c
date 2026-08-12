@@ -130,24 +130,24 @@ void svg_write_element(FILE *fp, SvgElement *elem) {
   }
 }
 
-void svg_write_document(FILE *fp, SvgDocument *doc) {
-  if (!doc || !fp) {
+void svg_write_document(FILE *fp, SvgDocument doc) {
+  if (!fp) {
     return;
   }
   fprintf(fp, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
   fprintf(fp, "<svg width=\"%g\" height=\"%g\" viewBox=\"0 0 %g %g\" xmlns=\"%s\">\n", //
-          doc->width, doc->height, doc->view_width, doc->view_height, doc->ns);
+          doc.width, doc.height, doc.view_width, doc.view_height, doc.ns);
 
-  if (doc->def_count > 0) {
+  if (doc.def_count > 0) {
     fprintf(fp, "<defs>\n");
 
-    for (size_t i = 0; i < doc->def_count; ++i) {
-      svg_write_element(fp, &doc->defs[i]);
+    for (size_t i = 0; i < doc.def_count; ++i) {
+      svg_write_element(fp, &doc.defs[i]);
     }
     fprintf(fp, "</defs>\n");
   }
-  for (size_t i = 0; i < doc->vector_count; ++i) {
-    svg_write_element(fp, &doc->vector[i]);
+  for (size_t i = 0; i < doc.vector_count; ++i) {
+    svg_write_element(fp, &doc.vector[i]);
   }
 
   fprintf(fp, "</svg>\n");

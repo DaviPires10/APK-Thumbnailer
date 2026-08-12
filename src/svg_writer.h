@@ -25,6 +25,6 @@
 
 void svg_write_attribute(FILE *fp, SvgAttribute attr);
 void svg_write_element(FILE *fp, SvgElement *elem);
-void svg_write_document(FILE *fp, SvgDocument *doc);
+void svg_write_document(FILE *fp, SvgDocument doc);
 
 #endif
