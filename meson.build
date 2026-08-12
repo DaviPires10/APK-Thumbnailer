@@ -9,16 +9,19 @@ project(
     ],
 )
 
-zip_dep = dependency('libzip', version: '>=1.0')
-magick_dep = dependency('GraphicsMagickWand', version: '>=1.0')
+zip_dep = dependency('libzip', version: '>=1.7.3')
+cairo_dep = dependency('cairo', version: '>=1.16.0')
+webp_dep = dependency('libwebp', version: '>=1.0.0')
+rsvg_dep = dependency('librsvg-2.0', version: '>=2.46.0')
 
-deps = [zip_dep, magick_dep]
+deps = [zip_dep, cairo_dep, webp_dep, rsvg_dep, dependency('libmagic')]
 
 src = files(
     'src/arsc.c',
     'src/apk.c',
     'src/binary_reader.c',
     'src/chunk.c',
+    'src/image.c',
     'src/main.c',
     'src/resource_value.c',
     'src/string_pool.c',
