@@ -23,10 +23,13 @@
 
 #include <cairo.h>
 #include <librsvg/rsvg.h>
-#include <magic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <webp/decode.h>
+
+#define MAGIC_PNG 0x474E5089u
+#define MAGIC_WEBP 0x46464952u
+#define MAGIC_XML 0x00080003u
 
 static cairo_status_t png_read_callback(void *closure, unsigned char *data, unsigned int length) {
   BinaryReader *reader = (BinaryReader *)closure;
@@ -392,30 +395,29 @@ cairo_surface_t *image_load_from_data(const uint8_t *data,
     return NULL;
   }
 
-  magic_t magic = magic_open(MAGIC_MIME_TYPE);
-  if (!magic) {
-    return NULL;
-  }
-  if (magic_load(magic, NULL) != 0) {
-    magic_close(magic);
-    return NULL;
-  }
-  const char *mime = magic_buffer(magic, data, size);
+  BinaryReader reader = set_buffer(data, size);
+  uint32_t magic      = read_u32(&reader);
 
-  if (mime) {
-    if (strcmp(mime, "image/png") == 0) {
+  switch (magic) {
+    case MAGIC_PNG: {
       cairo_surface_t *png = load_png(data, size);
       result               = image_scale_surface(png, target_size);
-      if (png)
+      if (png) {
         cairo_surface_destroy(png);
+      }
+
+      break;
     }
-    else if (strcmp(mime, "image/webp") == 0) {
+    case MAGIC_WEBP: {
       cairo_surface_t *webp = load_webp(data, size);
       result                = image_scale_surface(webp, target_size);
-      if (webp)
+      if (webp) {
         cairo_surface_destroy(webp);
+      }
+
+      break;
     }
-    else if (strcmp(mime, "application/octet-stream") == 0) {
+    case MAGIC_XML: {
       StringPool pool = {0};
       XmlElement *doc = xml_parse_document(data, size, &pool);
 
@@ -433,10 +435,11 @@ cairo_surface_t *image_load_from_data(const uint8_t *data,
         xml_free_element(doc);
       }
       string_pool_free(&pool);
+
+      break;
     }
   }
 
-  magic_close(magic);
   return result;
 }
 

@@ -14,7 +14,7 @@ cairo_dep = dependency('cairo', version: '>=1.16.0')
 webp_dep = dependency('libwebp', version: '>=1.0.0')
 rsvg_dep = dependency('librsvg-2.0', version: '>=2.46.0')
 
-deps = [zip_dep, cairo_dep, webp_dep, rsvg_dep, dependency('libmagic')]
+deps = [zip_dep, cairo_dep, webp_dep, rsvg_dep]
 
 src = files(
     'src/arsc.c',
