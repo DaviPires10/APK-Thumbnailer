@@ -174,7 +174,7 @@ static SvgTag svg_get_tag(XmlElement *elem, uint32_t *tag_indices) {
 
   for (size_t i = 0; i < countof(tags); ++i) {
     if (elem->name.index == tag_indices[i]) {
-      return (SvgTag)i;
+      return i + 1;
     }
   }
 
