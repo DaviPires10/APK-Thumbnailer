@@ -24,13 +24,13 @@
 #include <stddef.h>
 
 typedef enum {
+  TAG_UNKNOWN,
   TAG_GROUP,
   TAG_PATH,
   TAG_CLIP_PATH,
   TAG_ITEM,
   TAG_LINEAR_GRADIENT,
   TAG_RADIAL_GRADIENT,
-  TAG_UNKNOWN,
 } SvgTag;
 
 typedef struct {

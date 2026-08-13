@@ -323,8 +323,7 @@ static SvgElement svg_parse_path(SvgDocument *doc, XmlElement *elem, StringPool 
     else if (attr.value.type == TYPE_REFERENCE) {
       if (doc) {
         SvgElement def = {
-            .id  = xml_attr->value.raw,
-            .tag = TAG_UNKNOWN,
+            .id = xml_attr->value.raw,
         };
         svg_document_add_def(doc, def);
       }
@@ -382,7 +381,6 @@ static SvgElement svg_parse_clip_path(XmlElement *elem, StringPool pool) {
 
 static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
   SvgElement result = {0};
-  result.tag        = TAG_UNKNOWN;
   result.id         = UINT32_MAX;
 
   if (!elem) {
@@ -497,8 +495,7 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
       if (!stop) {
         svg_free_element(&result);
         memset(&result, 0, sizeof(result));
-        result.tag = TAG_UNKNOWN;
-        result.id  = UINT32_MAX;
+        result.id = UINT32_MAX;
         return result;
       }
       result.children[i] = stop;
@@ -512,7 +509,6 @@ static SvgElement svg_parse_gradient(XmlElement *elem, StringPool pool) {
 SvgElement
 svg_parse_element(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t *tag_indices) {
   SvgElement result = {0};
-  result.tag        = TAG_UNKNOWN;
   result.id         = UINT32_MAX;
 
   if (!elem || !tag_indices) {
