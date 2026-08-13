@@ -559,6 +559,29 @@ SvgElement svg_parse_def(XmlElement *elem, StringPool pool, uint32_t id) {
   return result;
 }
 
+SvgElement svg_parse_color(ResourceValue color, uint32_t id) {
+  SvgElement result = {0};
+  result.tag        = TAG_LINEAR_GRADIENT;
+  result.id         = id;
+
+  SvgElement *stop = create_stop_element(0.0f, color);
+
+  if (stop) {
+    result.child_count = 1;
+    result.children    = malloc(sizeof(SvgElement *));
+
+    if (result.children) {
+      result.children[0] = stop;
+    }
+    else {
+      free(stop);
+      result.child_count = 0;
+    }
+  }
+
+  return result;
+}
+
 void svg_document_add_def(SvgDocument *doc, SvgElement def) {
   if (!doc)
     return;

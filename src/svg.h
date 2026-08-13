@@ -70,6 +70,7 @@ SvgElement
 svg_parse_element(SvgDocument *doc, XmlElement *elem, StringPool pool, uint32_t *tag_indices);
 SvgDocument svg_parse_xml(XmlElement *root, StringPool pool);
 SvgElement svg_parse_def(XmlElement *elem, StringPool pool, uint32_t id);
+SvgElement svg_parse_color(ResourceValue color, uint32_t);
 void svg_document_add_def(SvgDocument *doc, SvgElement def);
 void svg_free_element(SvgElement *elem);
 void svg_free_document(SvgDocument *doc);

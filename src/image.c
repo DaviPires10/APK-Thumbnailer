@@ -109,7 +109,7 @@ static cairo_surface_t *load_webp(const uint8_t *data, size_t size) {
   return surf;
 }
 
-static cairo_surface_t *load_svg_text(const uint8_t *data, size_t size, int target_size) {
+static cairo_surface_t *load_svg_text(const char *data, size_t size, int target_size) {
   if (!data || size == 0 || target_size <= 0) {
     return NULL;
   }
@@ -231,26 +231,29 @@ static uint32_t get_id(XmlElement *elem, StringPool pool) {
     return UINT32_MAX;
   }
 
-  // Fucking ugly try and error search
   XmlAttribute *drawable = NULL;
-  if (elem->child_count > 0) {
-    XmlElement *inset = elem->children[0];
-    if (xml_element_has_name(inset, pool, "inset")) {
-      drawable = xml_find_attribute(inset, pool, "drawable");
-      if (!drawable) {
-        drawable = xml_find_attribute(inset, pool, "src");
+
+  if (elem->child_count == 0) {
+    drawable = xml_find_attribute(elem, pool, "drawable");
+  }
+  else {
+    for (size_t i = 0; i < elem->child_count; ++i) {
+      XmlElement *child = elem->children[i];
+
+      if (xml_element_has_name(child, pool, "inset")) {
+        drawable = xml_find_attribute(child, pool, "drawable");
+      }
+      else if (xml_element_has_name(child, pool, "bitmap")) {
+        drawable = xml_find_attribute(child, pool, "src");
       }
     }
   }
 
   if (!drawable) {
-    drawable = xml_find_attribute(elem, pool, "drawable");
-    if (!drawable) {
-      drawable = xml_find_attribute(elem, pool, "src");
-    }
+    return UINT32_MAX;
   }
 
-  return drawable ? drawable->value.raw : UINT32_MAX;
+  return drawable->value.raw;
 }
 
 cairo_surface_t *image_load_vector(zip_t *apk,
@@ -258,7 +261,7 @@ cairo_surface_t *image_load_vector(zip_t *apk,
                                    XmlElement *vector,
                                    StringPool pool,
                                    int target_size) {
-  if (!apk || !vector || !xml_element_has_name(vector, pool, "vector")) {
+  if (!apk || !vector) {
     return NULL;
   }
 
@@ -268,9 +271,11 @@ cairo_surface_t *image_load_vector(zip_t *apk,
   for (size_t i = 0; i < svg.def_count; ++i) {
     SvgElement def         = {0};
     ResourceValue resolved = arsc_table_resolve(table, svg.defs[i].id, 0);
+
     if (resolved.type == TYPE_STRING && resolved.data.string) {
-      size_t def_size;
+      size_t def_size   = 0;
       uint8_t *def_data = apk_extract_file(apk, resolved.data.string, &def_size);
+
       if (def_data) {
         StringPool def_pool = {0};
         XmlElement *def_xml = xml_parse_document(def_data, def_size, &def_pool);
@@ -283,17 +288,23 @@ cairo_surface_t *image_load_vector(zip_t *apk,
         free(def_data);
       }
     }
+    else if (resolved.type == TYPE_INT_COLOR_ARGB8 || resolved.type == TYPE_INT_COLOR_RGB8 ||
+             resolved.type == TYPE_INT_COLOR_ARGB4 || resolved.type == TYPE_INT_COLOR_RGB4) {
+      def = svg_parse_color(resolved, svg.defs[i].id);
+      svg_document_add_def(&svg, def);
+    }
   }
 
-  size_t svg_len;
+  size_t svg_len        = 0;
   char *svg_str         = svg_document_to_string(svg, &svg_len);
   cairo_surface_t *surf = NULL;
   if (svg_str) {
-    surf = load_svg_text((uint8_t *)svg_str, svg_len, target_size);
+    surf = load_svg_text(svg_str, svg_len, target_size);
     free(svg_str);
   }
 
   svg_free_document(&svg);
+
   return surf;
 }
 
@@ -302,7 +313,7 @@ cairo_surface_t *image_load_adaptive_icon(zip_t *apk,
                                           XmlElement *icon,
                                           StringPool pool,
                                           int target_size) {
-  if (!apk || !icon || !xml_element_has_name(icon, pool, "adaptive-icon")) {
+  if (!apk || !icon) {
     return NULL;
   }
 
@@ -314,6 +325,10 @@ cairo_surface_t *image_load_adaptive_icon(zip_t *apk,
 
   uint32_t bg_id = get_id(bg, pool);
   uint32_t fg_id = get_id(fg, pool);
+
+  if (bg_id == fg_id) {
+    bg_id = UINT32_MAX;
+  }
 
   if (bg && bg_id != UINT32_MAX) {
     ResourceValue bg_value = arsc_table_resolve(table, bg_id, 0);
@@ -388,7 +403,6 @@ cairo_surface_t *image_load_from_data(const uint8_t *data,
   const char *mime = magic_buffer(magic, data, size);
 
   if (mime) {
-
     if (strcmp(mime, "image/png") == 0) {
       cairo_surface_t *png = load_png(data, size);
       result               = image_scale_surface(png, target_size);
@@ -411,6 +425,10 @@ cairo_surface_t *image_load_from_data(const uint8_t *data,
         }
         else if (xml_element_has_name(doc, pool, "vector")) {
           result = image_load_vector(apk, table, doc, pool, target_size);
+        }
+        else if (xml_element_has_name(doc, pool, "color")) {
+          ResourceValue color = xml_find_attribute(doc, pool, "color")->value;
+          result              = load_color(color, target_size);
         }
         xml_free_element(doc);
       }
