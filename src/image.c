@@ -362,12 +362,6 @@ cairo_surface_t *image_load_adaptive_icon(zip_t *apk,
       }
     }
   }
-  else {
-    if (bg_surf) {
-      cairo_surface_destroy(bg_surf);
-    }
-    return NULL;
-  }
 
   if (bg_surf && fg_surf) {
     cairo_surface_t *result = image_composite_surfaces(bg_surf, fg_surf);
@@ -380,8 +374,12 @@ cairo_surface_t *image_load_adaptive_icon(zip_t *apk,
   else if (fg_surf) {
     return fg_surf;
   }
-
-  return NULL;
+  else {
+    if (bg_surf) {
+      cairo_surface_destroy(bg_surf);
+    }
+    return NULL;
+  }
 }
 
 cairo_surface_t *image_load_from_data(const uint8_t *data,
