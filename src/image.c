@@ -83,15 +83,15 @@ static cairo_surface_t *load_webp(const uint8_t *data, size_t size) {
   uint8_t *cairo_data = cairo_image_surface_get_data(surf);
   int stride          = cairo_image_surface_get_stride(surf);
 
-  for (int y = 0; y < height; ++y) {
-    uint8_t *row_src   = rgba + y * width * 4;
-    uint32_t *row_dest = (uint32_t *)(cairo_data + y * stride);
+  BinaryReader reader = set_buffer(rgba, width * height * 4);
 
+  for (int y = 0; y < height; ++y) {
+    uint32_t *row_dest = (uint32_t *)&cairo_data[y * stride];
     for (int x = 0; x < width; ++x) {
-      uint8_t r = row_src[x * 4 + 0];
-      uint8_t g = row_src[x * 4 + 1];
-      uint8_t b = row_src[x * 4 + 2];
-      uint8_t a = row_src[x * 4 + 3];
+      uint8_t r = read_u8(&reader);
+      uint8_t g = read_u8(&reader);
+      uint8_t b = read_u8(&reader);
+      uint8_t a = read_u8(&reader);
 
       if (a == 0) {
         row_dest[x] = 0;
