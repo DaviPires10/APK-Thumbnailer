@@ -11,7 +11,9 @@ It extracts the launcher icon from an APK and generates a thumbnail image, makin
 The following libraries and tools are required:
 
 - [libzip](https://libzip.org)
-- [GraphicsMagick](http://www.graphicsmagick.org)
+- [cairo](https://cairographics.org/)
+- [librsvg](https://wiki.gnome.org/Projects/LibRsvg)
+- [libwebp](https://developers.google.com/speed/webp)
 - Meson
 - Ninja
 - A C compiler with C11 support (GCC or Clang)
@@ -21,14 +23,14 @@ The following libraries and tools are required:
 ## Building
 
 ```bash
-meson setup builddir
-meson compile -C builddir
+meson setup build
+meson compile -C build
 ```
 
 The executable will be created at:
 
 ```bash
-builddir/apk-thumbnailer
+build/apk-thumbnailer
 ```
 
 ---
@@ -36,7 +38,7 @@ builddir/apk-thumbnailer
 ## Installation
 
 ```bash
-sudo meson install -C builddir
+sudo meson install -C build
 ```
 
 This installs:
@@ -74,17 +76,16 @@ apk-thumbnailer -i app.apk -o thumbnail.png -s 256
 
 1. Reads `AndroidManifest.xml` from the APK
 2. Finds the application icon resource
-3. Resolves icon paths from `resources.arsc`
-4. Selects the best raster image available
-5. Resizes and exports the thumbnail as PNG
+3. Resolves icon paths and color values from `resources.arsc`
+4. Detects file MIME types to properly handle PNG, WEBP, or XML data
+5. Parses Android Binary XML to support Adaptive Icons and Vector Drawables, rendering SVG data and compositing layers
+6. Resizes and exports the thumbnail as a PNG
 
 ---
 
 ## Limitations
 
 - APK split resources are not supported
-
-Most APKs still include high-resolution PNG fallback icons, so compatibility remains good in practice.
 
 ---
 
